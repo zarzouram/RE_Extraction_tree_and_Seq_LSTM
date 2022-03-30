@@ -1,0 +1,26 @@
+{
+    "seed": 9001,
+    "dataset": {
+        "stanza_models_dir": "/srv/data/zarzouram/resources/stanza/models",
+        "tags": {
+            "ent": {
+                "e1": "1",
+                "e2": "2",
+                "other": "o",
+                "pad": "o"
+            },
+            "rel": {
+                "right": "(e2,e1)",
+                "left": "(e1,e2)",
+                "other": "ndir"
+            },
+            "pad": {
+                "token": 0,
+                "pos": 0,
+                "dep": 0
+            }
+        },
+        "min_freq": 3,
+        "val_size": 800
+    }
+}

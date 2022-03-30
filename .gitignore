@@ -128,3 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .vscode
+scripts/tests/tests.py
+.vector_cache

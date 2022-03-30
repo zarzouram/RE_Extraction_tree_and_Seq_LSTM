@@ -1638,7 +1638,7 @@ Comment:
 Entity-Destination(e1,e2)
 Comment: b.4. allows temporal destinations.
 
-8411	"The time to the arrival of the first Brownian <e1>particle</e1> from an equilibrated continuum<e2>bath</e2> to an absorbing sphere was shown by Bordewijk in 1975."
+8411	"The time to the arrival of the first Brownian <e1>particle</e1> from an equilibrated continuum <e2>bath</e2> to an absorbing sphere was shown by Bordewijk in 1975."
 Entity-Origin(e1,e2)
 Comment:
 
@@ -2729,10 +2729,6 @@ Comment:
 8683	"There was weeping and wailing and gnashing of teeth in the <e1>camp</e1> of the <e2>outsiders</e2> now."
 Member-Collection(e2,e1)
 Comment: Refers camp to 'group' or to 'location'; here 'group' is appropriate.
-
-8684	"He noticed a speck of blood on the <e1>man</e1>'s <e2>thumb</e2> and what he thought were several corresponding drops on the driver's door of the truck."
-Component-Whole(e2,e1)
-Comment: modality is outside
 
 8685	"A <e1>data</e1> <e2>warehouse</e2> is a place where data is stored for archival purposes."
 Content-Container(e1,e2)
@@ -7462,7 +7458,7 @@ Comment:
 Member-Collection(e2,e1)
 Comment:
 
-9867	"The high <e1>pressure</e1> inside a<e2>caisson</e2> presents health risks."
+9867	"The high <e1>pressure</e1> inside a <e2>caisson</e2> presents health risks."
 Other
 Comment:
 
