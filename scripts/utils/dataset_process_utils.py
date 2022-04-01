@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import argparse
 
@@ -7,6 +7,7 @@ from itertools import chain
 
 from sklearn.model_selection import train_test_split
 
+import torch
 from torchtext.vocab import vocab
 from torchtext.vocab.vocab import Vocab
 
@@ -48,6 +49,14 @@ def parse_arguments():
     args = parser.parse_args()
 
     return args
+
+
+def encode_data(data: List[List[str]],
+                vocab: Vocab) -> Tuple[List[List[int]], List[int]]:
+
+    encoded = [torch.LongTensor(vocab.lookup_indices(d)) for d in data]
+
+    return encoded
 
 
 def build_vocab(data: List[List[str]],
