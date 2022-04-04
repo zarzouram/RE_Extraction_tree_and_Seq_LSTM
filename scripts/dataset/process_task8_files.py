@@ -184,6 +184,7 @@ def process_file(
     length: List[int] = []  # sentence length
     ent_lst: List[List[str]] = []  # list of tokens' tag "tag(e1, o, e2)"
     ents_last: List[Tuple[int, int]] = []  # list of last token id for entities
+    ids = []
 
     # Other variables
     ent_len_betn: List[int] = []  # length between ents' last token
@@ -259,6 +260,7 @@ def process_file(
         dep_tree_lst.append(dgl.graph((u_dep, v_dep)))
 
         # stack data in list
+        ids.append(idx)
         token_lst.append(token)
         ents_last.append((e1_ids[-1], e2_ids[-1]))
         length.append(len(token))
@@ -274,5 +276,6 @@ def process_file(
             check_ent_tag(ent, token, e1, e2, tags["ent"])
             check_shortest_path(u, v)
 
-    return (token_lst, ent_lst, pos_lst, dep_tag_lst, ents_last, dep_tree_lst,
-            shortest_path, length, ent_len_betn, rel_lst, rel_dir_lst)
+    return (ids, token_lst, ent_lst, pos_lst, dep_tag_lst, ents_last,
+            dep_tree_lst, shortest_path, length, ent_len_betn, rel_lst,
+            rel_dir_lst)

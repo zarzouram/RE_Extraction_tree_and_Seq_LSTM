@@ -18,7 +18,7 @@ def parse_arguments():
 
     parser.add_argument("--dataset_dir",
                         type=str,
-                        default="dataset/semeval_task8",
+                        default="dataset/semeval_task8/original/",
                         help="Directory contains task8 dataset.")
 
     parser.add_argument("--train_path",

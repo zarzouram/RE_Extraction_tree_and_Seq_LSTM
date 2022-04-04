@@ -52,46 +52,48 @@ if __name__ == "__main__":
     train_data, val_data = [], []
     for t_idx, v_idx in zip_longest(train_id, val_id):
         train_data.append(
-            [t_idx + 1] +
             [data["train"][i][t_idx] for i in range(len(data["train"]))])
         if v_idx is not None:
             val_data.append(
-                [v_idx + 1] +
                 [data["train"][i][v_idx] for i in range(len(data["train"]))])
 
-    data["train"] = train_data
-    data["val"] = val_data
-    print("splitting finished..")
+    data["train"] = list(zip(*train_data))
+    data["val"] = list(zip(*val_data))
+    print("splitting finished.")
 
+    print("saving files...")
     # create vocab
-    _, tokens, _, pos, dep, _, _, _, _, _, rels, rels_dir = zip(*data["train"])
+    _, tokens, _, pos, dep, _, _, _, _, _, rels, rels_dir = data["train"]
 
-    tokens_vocab = build_vocab(tokens, special_tokens=["<unk>", "<pad>"])
-    pos_vocab = build_vocab(pos, special_tokens=["<unk>", "<pad>"])
-    dep_vocab = build_vocab(dep, special_tokens=["<unk>", "<pad>"])
-    rels_vocab = build_vocab([rels])
-    rels_dir_vocab = build_vocab([rels_dir])
+    tokens_vocab = build_vocab(list(tokens), special_tokens=["<unk>", "<pad>"])
+    pos_vocab = build_vocab(list(pos), special_tokens=["<unk>", "<pad>"])
+    dep_vocab = build_vocab(list(dep), special_tokens=["<unk>", "<pad>"])
+    rels_vocab = build_vocab([list(rels)])
+    rels_dir_vocab = build_vocab([list(rels_dir)])
 
-    # encode, convert to torch save
+    tokens_vocab.set_default_index(tokens_vocab["<unk>"])
+    pos_vocab.set_default_index(pos_vocab["<unk>"])
+    dep_vocab.set_default_index(dep_vocab["<unk>"])
+
+    # encode, convert to torch, save
     for split in ["train", "val", "test"]:
         data2save = {}
-        data_unpacked = list(zip(*data[split]))
-        tokens = data_unpacked[1]
-        pos = data_unpacked[3]
-        dep = data_unpacked[4]
-        rels = data_unpacked[-2]
-        rels_dir = data_unpacked[-1]
-        tokens_encoded = encode_data(list(tokens), tokens_vocab)
-        pos_encoded = encode_data(list(pos), pos_vocab)
-        dep_encoded = encode_data(list(dep), dep_vocab)
-        rels_encoded = encode_data([list(rels)], rels_vocab)
-        rels_dir_encoded = encode_data([list(rels_dir)], rels_dir_vocab)
+        tokens = list(data[split][1])
+        pos = list(data[split][3])
+        dep = list(data[split][4])
+        rels = list(data[split][-2])
+        rels_dir = list(data[split][-1])
+        tokens_encoded = encode_data(tokens, tokens_vocab)
+        pos_encoded = encode_data(pos, pos_vocab)
+        dep_encoded = encode_data(dep, dep_vocab)
+        rels_encoded = encode_data([rels], rels_vocab)[0]
+        rels_dir_encoded = encode_data([rels_dir], rels_dir_vocab)[0]
 
         # save data
-        idx = data_unpacked[0]
-        trees = data_unpacked[6:8]
-        length = torch.LongTensor(data_unpacked[8])
-        e1_last, e2_last = zip(*data_unpacked[5])
+        idx = list(data[split][0])
+        trees = list(data[split][6:8])
+        length = torch.LongTensor(data[split][8])
+        e1_last, e2_last = zip(*data[split][5])
         e1_last, e2_last = torch.LongTensor(e1_last), torch.LongTensor(e2_last)
 
         data2save["idx"] = idx
@@ -114,3 +116,27 @@ if __name__ == "__main__":
         raw_file_name = f"raw_{split}.pt"
         raw_save_path = str(save_dir / raw_file_name)
         torch.save(data[split], raw_save_path)
+
+    # save vocab
+    file_name = "vocabs.pt"
+    save_path = str(save_dir / file_name)
+    vocabs = {
+        "tokens": tokens_vocab,
+        "pos": pos_vocab,
+        "dep": dep_vocab,
+        "rels": rels_vocab,
+        "rel_dir": rels_dir_vocab
+    }
+    torch.save(vocabs, save_path)
+
+    # write answer keys
+    answer_keys = ""
+    for lid, label, ldir in zip(idx, rels, rels_dir):
+        answer_dir = ldir if label != "Other" else ""
+        answer_keys += f"{lid}\t{label}{answer_dir}\n"
+    file_name = "answer_keys.txt"
+    save_path = str(save_dir / file_name)
+    with open(save_path, "w") as file:
+        file.write(answer_keys)
+
+    print("done.")
