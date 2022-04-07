@@ -90,7 +90,7 @@ if __name__ == "__main__":
         rels_dir_encoded = encode_data([rels_dir], rels_dir_vocab)[0]
 
         # save data
-        idx = list(data[split][0])
+        idx = torch.LongTensor([int(i) for i in data[split][0]])
         trees = list(data[split][6:8])
         length = torch.LongTensor(data[split][8])
         e1_last, e2_last = zip(*data[split][5])

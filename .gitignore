@@ -130,3 +130,6 @@ dmypy.json
 .vscode
 scripts/tests/tests.py
 .vector_cache
+dataset/semeval_task8/SemEval2010_task8_scorer-v1.2
+scripts/tests/answer_keys.txt
+scripts/tests/proposed_answers.txt
