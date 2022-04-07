@@ -47,32 +47,33 @@ class SemEvalTask8(Dataset):
         return len(self.ids)
 
 
+def collate_fn(batch):
+    # padd sequences and batch trees
+
+    data = list(zip(*batch))
+
+    ids = torch.stack(data[0])
+    lengths = torch.stack(data[4])
+    e1last = torch.stack(data[6])
+    e2last = torch.stack(data[6])
+    rellabels = torch.stack(data[-2])
+    reldir = torch.stack(data[-1])
+
+    deptree = dgl.batch(data[7])
+    shortest_path = dgl.batch(data[8])
+
+    tokens = pad_sequence(data[1], batch_first=True)
+    poss = pad_sequence(data[2], batch_first=True)
+    deps = pad_sequence(data[3], batch_first=True)
+
+    return (ids, tokens, poss, deps, lengths, e1last, e2last, deptree,
+            shortest_path, rellabels, reldir)
+
+
 if __name__ == "__main__":
     from pathlib import Path
     from torch.utils.data import DataLoader
     from tqdm import tqdm
-
-    def collate_fn(batch):
-        # padd sequences and batch trees
-
-        data = list(zip(*batch))
-
-        ids = torch.stack(data[0])
-        lengths = torch.stack(data[4])
-        e1last = torch.stack(data[6])
-        e2last = torch.stack(data[6])
-        rellabels = torch.stack(data[-2])
-        reldir = torch.stack(data[-1])
-
-        deptree = dgl.batch(data[7])
-        shortest_path = dgl.batch(data[8])
-
-        tokens = pad_sequence(data[1], batch_first=True)
-        poss = pad_sequence(data[2], batch_first=True)
-        deps = pad_sequence(data[3], batch_first=True)
-
-        return (ids, tokens, poss, deps, lengths, e1last, e2last, deptree,
-                shortest_path, rellabels, reldir)
 
     apath = Path("dataset/semeval_task8/processed/")
     for split in ["train", "val", "test"]:
