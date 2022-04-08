@@ -133,3 +133,4 @@ scripts/tests/tests.py
 dataset/semeval_task8/SemEval2010_task8_scorer-v1.2
 scripts/tests/answer_keys.txt
 scripts/tests/proposed_answers.txt
+scripts/tests/test_weights.py
