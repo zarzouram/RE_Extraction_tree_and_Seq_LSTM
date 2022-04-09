@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     print("saving files...")
     # create vocab
-    _, tokens, _, pos, dep, _, _, _, _, _, rels, rels_dir = data["train"]
+    _, tokens, _, pos, dep, _, _, _, _, _, _, rels, rels_dir = data["train"]
 
     tokens_vocab = build_vocab(list(tokens), special_tokens=["<unk>", "<pad>"])
     pos_vocab = build_vocab(list(pos), special_tokens=["<unk>", "<pad>"])
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         # save data
         idx = torch.LongTensor([int(i) for i in data[split][0]])
         trees = list(data[split][6:8])
-        length = torch.LongTensor(data[split][8])
+        length = torch.LongTensor(data[split][9])
         e1_last, e2_last = zip(*data[split][5])
         e1_last, e2_last = torch.LongTensor(e1_last), torch.LongTensor(e2_last)
 
@@ -105,6 +105,7 @@ if __name__ == "__main__":
         data2save["e2_last"] = e2_last
         data2save["dep_tree"] = trees[0]
         data2save["shortest_path"] = trees[1]
+        data2save["path_nodes"] = list(data[split][8])
         data2save["rels"] = rels_encoded
         data2save["rels_dir"] = rels_dir_encoded
 
