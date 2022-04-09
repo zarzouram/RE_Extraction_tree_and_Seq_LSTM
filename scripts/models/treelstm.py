@@ -193,8 +193,8 @@ E. TreeLSTMCell Impelementation:
 
 # pytorch
 import torch
-from torch import Tensor
 import torch.nn as nn
+from torch.nn.init import xavier_normal_
 
 # DGL
 import dgl
@@ -260,7 +260,7 @@ class TreeLSTMCell(nn.Module):
 
         # Steps 3.b.c
         X = self.W_f(nodes.data["emb"])  # (Nt, H)
-        F_tmk = X[:, None, :] + f + self.b_f   # (Nt, 2, H)
+        F_tmk = X[:, None, :] + f + self.b_f  # (Nt, 2, H)
         F_tmk = torch.sigmoid(self.norm_f(F_tmk))
         c_tmk = torch.stack([ct_0, ct_1], dim=1)  # (Nt, 2, H)
         c_cell = torch.sum(F_tmk * c_tmk, dim=1)  # (Nt, H)
@@ -268,11 +268,12 @@ class TreeLSTMCell(nn.Module):
         return {"h": h_iou, "c": c_cell}
 
     def apply_node_func(self, nodes):
-        # The leaf nodes have no child the h_child is initialized.
+
         h_cell = nodes.data["h"]
         c_cell = nodes.data["c"]
 
         # Initialization for leaf nodes
+        # The leaf nodes have no child the h_child is initialized.
         if nodes._graph.srcnodes().nelement() == 0:  # leaf nodes
             # initialize h states, for node type-0 and node type-1
             # NOTE: initialization for node type-0 == node type-1
@@ -303,21 +304,29 @@ class TypeTreeLSTM(nn.Module):
         self.bidirectional = bidirectional
         self.TeeLSTM_cell = TreeLSTMCell(embedding_dim, h_size)
 
-    def forward(self, g: DGLGraph, h0: Tensor, c0: Tensor):
+        # learnable initial states
+        self.init_states()
+
+    def init_states(self):
+        h0 = torch.zeros(1, self.h_size)
+        c0 = torch.zeros(1, self.h_size)
+        xavier_normal_(h0, gain=nn.init.calculate_gain("Sigmoid"))
+        xavier_normal_(c0, gain=nn.init.calculate_gain("Sigmoid"))
+        self.h0 = nn.Parameter(h0, requires_grad=True)
+        self.c0 = nn.Parameter(c0, requires_grad=True)
+
+    def forward(self, g: DGLGraph):
         """A modified N-ary tree-lstm (LSTM-ER) network
         ----------
         g:      dgl.DGLGraph
                 Batch of Trees for computation
-        h0:     Tensor
-                Initial hidden state.
-        c0:     Tensor
-                Initial cell state.
         Returns
         -------
         logits: Tensor
         """
-
-        # Tree-LSTM (LSTM-ER) according to arXiv:1601.00770v3 sections 3.3 & 3.4
+        # initialize hiddedn and cell state
+        h0 = self.h0.repeat(g.num_nodes(), 1)
+        c0 = self.c0.repeat(g.num_nodes(), 1)
         g.ndata["h"] = h0
         g.ndata["c"] = c0
 
