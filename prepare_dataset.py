@@ -63,9 +63,10 @@ if __name__ == "__main__":
 
     print("saving files...")
     # create vocab
-    _, tokens, _, pos, dep, _, _, _, _, _, _, rels, rels_dir = data["train"]
+    _, tokens, ents, pos, dep, _, _, _, _, rels, rels_dir = data["train"]
 
     tokens_vocab = build_vocab(list(tokens), special_tokens=["<unk>", "<pad>"])
+    ents_vocab = build_vocab(list(ents), special_tokens=["<pad>"])
     pos_vocab = build_vocab(list(pos), special_tokens=["<unk>", "<pad>"])
     dep_vocab = build_vocab(list(dep), special_tokens=["<unk>", "<pad>"])
     rels_vocab = build_vocab([list(rels)])
@@ -79,11 +80,13 @@ if __name__ == "__main__":
     for split in ["train", "val", "test"]:
         data2save = {}
         tokens = list(data[split][1])
+        ents = list(data[split][2])
         pos = list(data[split][3])
         dep = list(data[split][4])
         rels = list(data[split][-2])
         rels_dir = list(data[split][-1])
         tokens_encoded = encode_data(tokens, tokens_vocab)
+        ents_encoded = encode_data(ents, ents_vocab)
         pos_encoded = encode_data(pos, pos_vocab)
         dep_encoded = encode_data(dep, dep_vocab)
         rels_encoded = encode_data([rels], rels_vocab)[0]
@@ -91,21 +94,17 @@ if __name__ == "__main__":
 
         # save data
         idx = torch.LongTensor([int(i) for i in data[split][0]])
-        trees = list(data[split][6:8])
-        length = torch.LongTensor(data[split][9])
-        e1_last, e2_last = zip(*data[split][5])
-        e1_last, e2_last = torch.LongTensor(e1_last), torch.LongTensor(e2_last)
+        trees = list(data[split][5:7])
+        length = torch.LongTensor(data[split][7])
 
         data2save["idx"] = idx
         data2save["tokens"] = tokens_encoded
+        data2save["ents"] = ents_encoded
         data2save["pos"] = pos_encoded
         data2save["dep"] = dep_encoded
         data2save["length"] = length
-        data2save["e1_last"] = e1_last
-        data2save["e2_last"] = e2_last
         data2save["dep_tree"] = trees[0]
         data2save["shortest_path"] = trees[1]
-        data2save["path_nodes"] = list(data[split][8])
         data2save["rels"] = rels_encoded
         data2save["rels_dir"] = rels_dir_encoded
 
@@ -123,6 +122,7 @@ if __name__ == "__main__":
     save_path = str(save_dir / file_name)
     vocabs = {
         "tokens": tokens_vocab,
+        "ents": ents_vocab,
         "pos": pos_vocab,
         "dep": dep_vocab,
         "rels": rels_vocab,

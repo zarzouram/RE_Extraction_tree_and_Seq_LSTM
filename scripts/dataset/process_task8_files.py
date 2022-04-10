@@ -7,11 +7,26 @@ from collections import Counter
 
 import networkx as nx
 import dgl
+from dgl.traversal import topological_nodes_generator as traverse_topo
 from dgl import DGLGraph
 
 import torch
 
 import stanza
+
+
+def check_shortest_tree(u, v, path_nodes, path_tree, dep_tree):
+    assert nx.is_tree(dgl.to_networkx(path_tree))
+
+    # get shortest path nodes using networks
+    path_nx = nx.DiGraph(list(zip(u, v)))
+    path_g = dgl.node_subgraph(dep_tree, [n for n in path_nx.nodes()])
+    short_nodes = path_g.ndata["_ID"]
+
+    short_nodes, _ = torch.sort(short_nodes)
+    path_nodes, _ = torch.sort(path_nodes)
+
+    assert torch.all(path_nodes == short_nodes).item()
 
 
 def check_ent_tag(ent_tags, tokens, e1, e2, tags):
@@ -179,12 +194,10 @@ def process_file(
     rel_dir_lst: List[List[str]] = []  # list of "relation direction list"
     dep_tree_lst: List[DGLGraph] = []  # list of dependency trees in dgl graph
     shortest_path: List[DGLGraph] = []  # path from e1 to e2 in dgl graph
-    path_nodes: List[int] = []
 
     # variables needed during training
     length: List[int] = []  # sentence length
     ent_lst: List[List[str]] = []  # list of tokens' tag "tag(e1, o, e2)"
-    ents_last: List[Tuple[int, int]] = []  # list of last token id for entities
     ids = []
 
     # Other variables
@@ -249,7 +262,7 @@ def process_file(
         u_dep, v_dep = zip(*[(ud, vd) for ud, vd in enumerate(dep_tree)
                              if ud != vd])
         u_dep, v_dep = torch.LongTensor(u_dep), torch.LongTensor(v_dep)
-        dep_g = dgl.graph((u_dep, v_dep))
+        dep_g = dgl.graph((u_dep, v_dep))  # type: DGLGraph
 
         # get shortest path from e1 to e2
         u, v = get_path(tree=dep_tree, left=e1_ids[-1], right=e2_ids[-1])
@@ -258,30 +271,47 @@ def process_file(
 
         # convert trees into dgl grahs
         # shortest path tree
-        # from u,v -> networkx then get subgraph from the main dependency graph
-        #   There is an issue using u,v and directly creating graph using
+        # from u,v -> create shortest path graph
+        #   There is an issue using u,v directly creating graph using
         #   dgl. The dgl expected that u,v are tensors that represent
         #   consecutive integer nodes' Ids. Thus, when creating graph using dgl
-        #   with u,v = (15, 12), the dgl will creat a graph with 16 nodes and
-        #   one edge from 15 to 12.
-        path_nx = nx.DiGraph(list(zip(u, v)))
-        shortest_path_g = dgl.node_subgraph(dep_g,
-                                            [n for n in path_nx.nodes()])
-        path_nodes.append(shortest_path_g.ndata["_ID"])
-        # Node type: shortest path node = 0. all other nodes = 1
-        nodes_type = torch.zeros(shortest_path_g.num_nodes(), dtype=torch.long)
-        shortest_path_g.ndata["n_type"] = nodes_type
-        nodes_type = torch.ones(dep_g.num_nodes(), dtype=torch.long)
-        nodes_type[path_nodes[-1]] = 0
-        dep_g.ndata["n_type"] = nodes_type
+        #   with, say, u,v = (15, 12), the dgl will creat a graph with 16 nodes
+        #   and one edge from 15 to 12.
+        dep_nodes = torch.arange(dep_g.num_nodes())
+        path_nodes = torch.LongTensor(u + [v[-1]])  # v[-1]: root
+        nmap = {n: i
+                for i, n in enumerate(path_nodes.tolist())}  # nodes id map
+        u_ = torch.LongTensor([nmap[n] for n in u])
+        v_ = torch.LongTensor([nmap[n] for n in v])
+        path_g = dgl.graph((u_, v_))  # type: DGLGraph
+        path_g.ndata["ID"] = path_nodes
 
-        dep_tree_lst.append(dep_g)
-        shortest_path.append(shortest_path_g)
+        # all other nodes not in the shortest path
+        opath_idx = torch.all(dep_nodes[:, None] != path_nodes, dim=1)
+        opath_nodes = dep_nodes[opath_idx]
+
+        # assigne some information to our nodes
+        short_ndata = torch.zeros(path_g.num_nodes(), dtype=torch.long)
+        dep_ndata = torch.zeros(dep_g.num_nodes(), dtype=torch.long)
+
+        # 1. nodes belong to short path = 0 elsr 1
+        path_g.nodes[:].data["n_type"] = short_ndata
+        dep_g.nodes[opath_nodes].data["n_type"] = dep_ndata[opath_nodes] + 1
+
+        # 2. trees root
+        path_g.nodes[nmap[v[-1]]].data["root"] = torch.LongTensor([1])
+        root = list(traverse_topo(dep_g))[-1]
+        dep_g.nodes[root].data["root"] = torch.LongTensor([1])
+
+        # 3. assign ents last tokens in trees
+        path_g.nodes[nmap[e1_ids[-1]]].data["e1"] = torch.LongTensor([1])
+        path_g.nodes[nmap[e2_ids[-1]]].data["e2"] = torch.LongTensor([1])
 
         # stack data in list
+        dep_tree_lst.append(dep_g)
+        shortest_path.append(path_g)
         ids.append(idx)
         token_lst.append(token)
-        ents_last.append((e1_ids[-1], e2_ids[-1]))
         length.append(len(token))
         ent_len_betn.append(e2_ids[-1] - e1_ids[-1] - 1)
         ent_lst.append(ent)
@@ -294,8 +324,7 @@ def process_file(
             e1, e2 = matches[0].group(), matches[1].group()
             check_ent_tag(ent, token, e1, e2, tags["ent"])
             check_shortest_path(u, v)
-            assert nx.is_tree(dgl.to_networkx(shortest_path_g))
+            check_shortest_tree(u, v, path_nodes, path_g, dep_g)
 
-    return (ids, token_lst, ent_lst, pos_lst, dep_tag_lst, ents_last,
-            dep_tree_lst, shortest_path, path_nodes, length, ent_len_betn,
-            rel_lst, rel_dir_lst)
+    return (ids, token_lst, ent_lst, pos_lst, dep_tag_lst, dep_tree_lst,
+            shortest_path, length, ent_len_betn, rel_lst, rel_dir_lst)

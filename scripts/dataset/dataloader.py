@@ -15,11 +15,10 @@ class SemEvalTask8(Dataset):
         data = torch.load(datset_path)
         self.ids = data["idx"]
         self.tokens = data["tokens"]
+        self.ents = data["ents"]
         self.poss = data["pos"]
         self.deps = data["dep"]
         self.lengths = data["length"]
-        self.e1last = data["e1_last"]
-        self.e2last = data["e2_last"]
         self.deptree = data["dep_tree"]
         self.shortest_path = data["shortest_path"]
         self.rellabels = data["rels"]
@@ -28,46 +27,52 @@ class SemEvalTask8(Dataset):
     def __getitem__(self, i: int):
         ids: Tensor = self.ids[i]
         tokens: Tensor = self.tokens[i]
+        ents: Tensor = self.ents[i]
         poss: Tensor = self.poss[i]
         deps: Tensor = self.deps[i]
         lengths: Tensor = self.lengths[i]
-        e1last: Tensor = self.e1last[i]
-        e2last: Tensor = self.e2last[i]
         deptree: DGLHeteroGraph = self.deptree[i]
         shortest_path: DGLHeteroGraph = self.shortest_path[i]
         rellabels: Tensor = self.rellabels[i]
         reldir: Tensor = self.reldir[i]
 
         return [
-            ids, tokens, poss, deps, lengths, e1last, e2last, deptree,
-            shortest_path, rellabels, reldir
+            ids, tokens, ents, poss, deps, lengths, deptree, shortest_path,
+            rellabels, reldir
         ]
 
     def __len__(self):
         return len(self.ids)
 
 
-def collate_fn(batch):
-    # padd sequences and batch trees
+class collate_fn(object):
 
-    data = list(zip(*batch))
+    def __init__(self, padding_values):
+        self.tp = padding_values[0]
+        self.ep = padding_values[1]
+        self.pp = padding_values[2]
+        self.dp = padding_values[3]
 
-    ids = torch.stack(data[0])
-    lengths = torch.stack(data[4])
-    e1last = torch.stack(data[6])
-    e2last = torch.stack(data[6])
-    rellabels = torch.stack(data[-2])
-    reldir = torch.stack(data[-1])
+    def __call__(self, batch):
+        # padd sequences and batch trees
 
-    deptree = dgl.batch(data[7])
-    shortest_path = dgl.batch(data[8])
+        data = list(zip(*batch))
 
-    tokens = pad_sequence(data[1], batch_first=True)
-    poss = pad_sequence(data[2], batch_first=True)
-    deps = pad_sequence(data[3], batch_first=True)
+        ids = torch.stack(data[0])
+        lengths = torch.stack(data[5])
+        rellabels = torch.stack(data[-2])
+        reldir = torch.stack(data[-1])
 
-    return (ids, tokens, poss, deps, lengths, e1last, e2last, deptree,
-            shortest_path, rellabels, reldir)
+        deptree = dgl.batch(data[6])
+        shortest_path = dgl.batch(data[7])
+
+        tokens = pad_sequence(data[1], padding_value=self.tp, batch_first=True)
+        ents = pad_sequence(data[2], padding_value=self.ep, batch_first=True)
+        poss = pad_sequence(data[3], padding_value=self.pp, batch_first=True)
+        deps = pad_sequence(data[4], padding_value=self.dp, batch_first=True)
+
+        return (ids, tokens, ents, poss, deps, lengths, deptree, shortest_path,
+                rellabels, reldir)
 
 
 if __name__ == "__main__":
@@ -85,7 +90,9 @@ if __name__ == "__main__":
             "shuffle": True,
             "num_workers": 4,
         }
-        data_loader = DataLoader(ds, **loader_params, collate_fn=collate_fn)
+        data_loader = DataLoader(ds,
+                                 **loader_params,
+                                 collate_fn=collate_fn([0, 0, 0, 0]))
 
         for data in tqdm(data_loader):
             pass
