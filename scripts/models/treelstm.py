@@ -203,13 +203,13 @@ from dgl import DGLGraph
 
 class TreeLSTMCell(nn.Module):
 
-    def __init__(self, emb_size, h_size):
+    def __init__(self, input_size, h_size):
         super(TreeLSTMCell, self).__init__()
-        self.W_iou = nn.Linear(emb_size, 3 * h_size, bias=False)
+        self.W_iou = nn.Linear(input_size, 3 * h_size, bias=False)
         self.U_iou = nn.Linear(2 * h_size, 3 * h_size, bias=False)
         self.b_iou = nn.Parameter(torch.zeros(1, 3 * h_size))
 
-        self.W_f = nn.Linear(emb_size, h_size, bias=False)
+        self.W_f = nn.Linear(input_size, h_size, bias=False)
         self.U_f = nn.Linear(2 * h_size, 2 * h_size, bias=False)
         self.b_f = nn.Parameter(torch.zeros(1, h_size))
 
@@ -294,7 +294,7 @@ class TreeLSTM(nn.Module):
 
     def __init__(
         self,
-        embedding_dim,
+        input_size,
         h_size,
         bidirectional,
     ):
@@ -302,7 +302,7 @@ class TreeLSTM(nn.Module):
         super(TreeLSTM, self).__init__()
 
         self.bidirectional = bidirectional
-        self.TeeLSTM_cell = TreeLSTMCell(embedding_dim, h_size)
+        self.TeeLSTM_cell = TreeLSTMCell(input_size, h_size)
 
         # learnable initial states
         self.init_states()

@@ -12,9 +12,9 @@ class SeqEncoder(nn.Module):
                  input_size: int,
                  h_size: int,
                  num_layers: int,
-                 bidirectional: bool = True,
-                 dropout: float = 0.0):
-        super().__init__()
+                 dropout: float,
+                 bidirectional: bool = True):
+        super(SeqEncoder, self).__init__()
 
         self.h_size = h_size
         self.num_layers = num_layers
@@ -25,7 +25,8 @@ class SeqEncoder(nn.Module):
                             num_layers=num_layers,
                             bidirectional=bidirectional,
                             batch_first=True,
-                            dropout=dropout)
+                            dropout=dropout if num_layers > 1 else 0)
+        self.dropout = nn.Dropout(dropout)
         # learnable initial states
         self.init_states()
 
@@ -41,12 +42,8 @@ class SeqEncoder(nn.Module):
     def forward(self, seq: Tensor, lengths: Tensor, padding_value: float):
 
         b_sz = seq.size(0)
-        sorted_lengths, sorted_idxs = torch.sort(lengths, descending=True)
-        seq = seq[sorted_idxs]
 
-        x_packed = pack_padded_sequence(seq,
-                                        lengths=sorted_lengths,
-                                        batch_first=True)
+        x_packed = pack_padded_sequence(seq, lengths=lengths, batch_first=True)
 
         init_states = (self.h0.repeat(1, b_sz, 1), self.c0.repeat(1, b_sz, 1))
         output_packed, _ = self.lstm(x_packed, init_states)
@@ -54,9 +51,6 @@ class SeqEncoder(nn.Module):
         output, _ = pad_packed_sequence(output_packed,
                                         batch_first=True,
                                         padding_value=padding_value,
-                                        total_length=sorted_lengths[0])
+                                        total_length=lengths[0])
 
-        _, original_idxs = torch.sort(sorted_idxs, descending=False)
-        output = output[original_idxs]
-
-        return output
+        return self.dropout(output)

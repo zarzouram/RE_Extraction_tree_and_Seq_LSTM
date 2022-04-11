@@ -58,18 +58,25 @@ class collate_fn(object):
 
         data = list(zip(*batch))
 
-        ids = torch.stack(data[0])
         lengths = torch.stack(data[5])
-        rellabels = torch.stack(data[-2])
-        reldir = torch.stack(data[-1])
+        lengths, sorted_idxs = torch.sort(lengths, descending=True)
 
-        deptree = dgl.batch(data[6])
-        shortest_path = dgl.batch(data[7])
+        ids = torch.stack(data[0])[sorted_idxs]
+        deptree = dgl.batch([data[6][i] for i in sorted_idxs])
+        shortest_path = dgl.batch([data[7][i] for i in sorted_idxs])
+
+        rellabels = torch.stack(data[-2])[sorted_idxs]
+        reldir = torch.stack(data[-1])[sorted_idxs]
 
         tokens = pad_sequence(data[1], padding_value=self.tp, batch_first=True)
         ents = pad_sequence(data[2], padding_value=self.ep, batch_first=True)
         poss = pad_sequence(data[3], padding_value=self.pp, batch_first=True)
         deps = pad_sequence(data[4], padding_value=self.dp, batch_first=True)
+
+        tokens = tokens[sorted_idxs]
+        ents = ents[sorted_idxs]
+        poss = poss[sorted_idxs]
+        deps = deps[sorted_idxs]
 
         return (ids, tokens, ents, poss, deps, lengths, deptree, shortest_path,
                 rellabels, reldir)
