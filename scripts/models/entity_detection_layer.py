@@ -6,8 +6,8 @@ class EntityDetection(nn.Module):
 
     def __init__(
         self,
-        entl_vocab_sz,
-        entl_emb_sz,
+        entl_vocab_sz: int,
+        entl_emb_sz: int,
         input_sz: int,
         output_sz: int,
         hidden_sz: int,
@@ -21,4 +21,7 @@ class EntityDetection(nn.Module):
         raise NotImplementedError
 
     def forward(self, inputs: Tensor, epsilon: float):
+        raise NotImplementedError
+
+    def inference(self, inputs: Tensor):
         raise NotImplementedError
