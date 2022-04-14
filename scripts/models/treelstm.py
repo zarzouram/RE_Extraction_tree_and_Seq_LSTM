@@ -235,7 +235,7 @@ class TreeLSTMCell(nn.Module):
         type_n0_id = type_n == 0
         type_n1_id = type_n == 1
 
-        # 1.b: creat mask matrix with the same size of h and c with zeros at
+        # creat mask matrix with the same size of h and c with zeros at
         # either type_0 node ids or type_1 node ids
         mask = torch.zeros_like(h_child, requires_grad=False)
         mask[type_n0_id] = 1  # mask one at type_0 nodes

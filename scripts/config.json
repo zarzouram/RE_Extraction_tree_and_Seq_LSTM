@@ -16,5 +16,33 @@
         },
         "min_freq": 3,
         "val_size": 800
+    },
+
+    "model_hperp": {
+        "embeddings": {
+            "token_emb_sz": 0,
+            "pos_emb_sz": 0,
+            "dep_emb_sz": 0,
+            "entl_emb_sz": 0
+        },
+        "entity_detect": {
+            "hs_size": 0,
+            "ht_size": 0,
+            "num_layers_seq": 1,
+            "bidir_seq": true,
+            "schedule_k": 1.0
+        },
+        "dep_tree": {
+            "htree_size": 0,
+            "bidir_tree": true,
+            "tree_type": "shortest_path"
+        },
+        "rel_extract": {
+            "hp_size": 0
+        },
+        "modes": {
+            "end2end": false,
+            "pretrain": false
+        }
     }
 }

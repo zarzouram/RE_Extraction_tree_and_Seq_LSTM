@@ -47,11 +47,12 @@ class SemEvalTask8(Dataset):
 
 class collate_fn(object):
 
-    def __init__(self, padding_values):
+    def __init__(self, padding_values, tree_type="shortest_path"):
         self.tp = padding_values[0]
         self.ep = padding_values[1]
         self.pp = padding_values[2]
         self.dp = padding_values[3]
+        self.tree_type = tree_type
 
     def __call__(self, batch):
         # padd sequences and batch trees
@@ -78,8 +79,19 @@ class collate_fn(object):
         poss = poss[sorted_idxs]
         deps = deps[sorted_idxs]
 
-        return (ids, tokens, ents, poss, deps, lengths, deptree, shortest_path,
-                rellabels, reldir)
+        if self.tree_type == "shortest_path":
+            tree = shortest_path
+        elif self.tree_type == "full_tree":
+            tree = deptree
+        elif self.tree_type == "sub_tree":
+            raise NotImplementedError
+        else:
+            raise ValueError(
+                "tree_type value should be either 'shortest_path' or 'full_tree' or 'sub_tree'"  # noqa: E501
+            )
+
+        return (ids, tokens, ents, poss, deps, lengths, tree, rellabels,
+                reldir)
 
 
 if __name__ == "__main__":
