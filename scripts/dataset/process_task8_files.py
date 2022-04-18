@@ -29,7 +29,8 @@ def check_shortest_tree(u, v, path_nodes, path_tree, dep_tree):
     assert torch.all(path_nodes == short_nodes).item()
 
 
-def check_ent_tag(ent_tags, tokens, e1, e2, tags):
+def check_ent_tag(ent_tags: List[str], tokens: List[str], e1: str, e2: str,
+                  tags: Dict[str, str]):
     """confirm that entity tagging is ok.
     """
     # each sample shoul have e1 and e2
@@ -43,9 +44,9 @@ def check_ent_tag(ent_tags, tokens, e1, e2, tags):
 
     # assert that tagged tokens are actually what extracted by regex
     for i in idx_1:
-        assert tokens[i] in e1
+        assert tokens[i].split("_")[0] in e1.lower()
     for i in idx_2:
-        assert tokens[i] in e2
+        assert tokens[i].split("_")[0] in e2.lower()
 
 
 def check_shortest_path(u, v):
@@ -229,7 +230,7 @@ def process_file(
         # short_path: List[int] = []  # shortest path between e1 and e2
         for sent in doc.sentences:
             for word in sent.words:
-                token.append(word.text)  # tokenized tokens
+                token.append(f"{word.text.lower()}_{word.upos}")
                 pos.append(word.upos)  # pos for each token
 
                 # extract token tagged by <e1> and <e2>

@@ -11,38 +11,63 @@
             "rel": {
                 "right": "(e2,e1)",
                 "left": "(e1,e2)",
-                "other": "ndir"
+                "other": "ndir",
+                "neg_rel": "Other"
             }
         },
-        "min_freq": 3,
+        "min_freq": 2,
         "val_size": 800
     },
-
-    "model_hperp": {
+    "model_hyperp": {
         "embeddings": {
-            "token_emb_sz": 0,
-            "pos_emb_sz": 0,
-            "dep_emb_sz": 0,
-            "entl_emb_sz": 0
+            "token_emb_sz": 200,
+            "pos_emb_sz": 25,
+            "dep_emb_sz": 25,
+            "entl_emb_sz": 25
         },
         "entity_detect": {
-            "hs_size": 0,
-            "ht_size": 0,
+            "hs_size": 100,
+            "ht_size": 100,
             "num_layers_seq": 1,
             "bidir_seq": true,
             "schedule_k": 1.0
         },
         "dep_tree": {
-            "htree_size": 0,
+            "htree_size": 100,
             "bidir_tree": true,
             "tree_type": "shortest_path"
         },
         "rel_extract": {
-            "hp_size": 0
+            "hp_size": 100
         },
         "modes": {
             "end2end": false,
             "pretrain": false
+        },
+        "dropouts": {
+            "token_embd": 0.5,
+            "dep_embed": 0.0,
+            "lstm": 0.0,
+            "lstm_out": 0.0,
+            "rel_h": 0.3,
+            "ent_h": 0.0,
+            "ent_label": 0.3
         }
+    },
+    "dataloader_parms": {
+        "batch_size": 63,
+        "shuffle": true,
+        "num_workers": 4
+    },
+    "train_parms": {
+        "epochs": 100,
+        "early_stop": 10,
+        "lr_patience": 5,
+        "grad_clip": 5.0
+    },
+    "optim_params": {
+        "lr": 2e-3,
+        "l2reg": 1e-6,
+        "gamma": 0.9
     }
 }

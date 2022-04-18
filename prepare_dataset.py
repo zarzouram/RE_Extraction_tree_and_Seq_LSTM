@@ -65,7 +65,9 @@ if __name__ == "__main__":
     # create vocab
     _, tokens, ents, pos, dep, _, _, _, _, rels, rels_dir = data["train"]
 
-    tokens_vocab = build_vocab(list(tokens), special_tokens=["<unk>", "<pad>"])
+    tokens_vocab = build_vocab(list(tokens),
+                               special_tokens=["<unk>", "<pad>"],
+                               min_freq=config["min_freq"])
     ents_vocab = build_vocab(list(ents), special_tokens=["<pad>"])
     pos_vocab = build_vocab(list(pos), special_tokens=["<unk>", "<pad>"])
     dep_vocab = build_vocab(list(dep), special_tokens=["<unk>", "<pad>"])

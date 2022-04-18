@@ -49,9 +49,9 @@ class collate_fn(object):
 
     def __init__(self, padding_values, tree_type="shortest_path"):
         self.tp = padding_values[0]
-        self.ep = padding_values[1]
-        self.pp = padding_values[2]
-        self.dp = padding_values[3]
+        self.pp = padding_values[1]
+        self.dp = padding_values[2]
+        self.ep = padding_values[3]
         self.tree_type = tree_type
 
     def __call__(self, batch):
@@ -59,7 +59,7 @@ class collate_fn(object):
 
         data = list(zip(*batch))
 
-        lengths = torch.stack(data[5])
+        lengths = torch.stack(data[5]).type(torch.int64).requires_grad_(False)
         lengths, sorted_idxs = torch.sort(lengths, descending=True)
 
         ids = torch.stack(data[0])[sorted_idxs]

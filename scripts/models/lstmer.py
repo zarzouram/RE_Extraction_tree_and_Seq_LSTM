@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 from torch import Tensor
 
 from dgl import DGLGraph
@@ -6,10 +6,10 @@ from dgl import DGLGraph
 import torch
 import torch.nn as nn
 
-from embeddinglayer import EmbeddingLayer
-from sequence_layer import SeqEncoder
-from entity_detection_layer import EntityDetection
-from dependency_layer import DepLayer
+from .embeddinglayer import EmbeddingLayer
+from .sequence_layer import SeqEncoder
+from .entity_detection_layer import EntityDetection
+from .dependency_layer import DepLayer
 
 
 class LSTMER(nn.Module):
@@ -32,9 +32,8 @@ class LSTMER(nn.Module):
                  htree_size: int,
                  hp_size: int,
                  num_layers_seq: int,
-                 ents_num: int,
                  rel_num: int,
-                 dropout: float = 0.1,
+                 dropouts: Dict[str, float],
                  schedule_k: float = 1.,
                  bidir_seq: bool = True,
                  bidir_tree: bool = True,
@@ -57,26 +56,38 @@ class LSTMER(nn.Module):
         self.htree_size = 3 * htree_size if bidir_tree else 2 * htree_size
         self.entl_emb_sz = entl_emb_sz if end2end else 0
 
-        self.embeddings = EmbeddingLayer(token_vocab_sz, pos_vocab_sz,
-                                         token_emb_sz, pos_emb_sz,
-                                         token_pad_value, pos_pad_value)
+        # Word and POS embediings: Section 3.1
+        self.embeddings = EmbeddingLayer(token_vocab_sz,
+                                         pos_vocab_sz,
+                                         token_emb_sz,
+                                         pos_emb_sz,
+                                         token_pad_value,
+                                         pos_pad_value,
+                                         dropout=dropouts["token_embd"])
 
-        self.seq_encoder = SeqEncoder(input_size=token_emb_sz,
+        # Sequence layer: Section 3.2
+        self.seq_encoder = SeqEncoder(input_size=token_emb_sz + pos_emb_sz,
                                       h_size=hs_size,
                                       num_layers=num_layers_seq,
                                       bidirectional=bidir_seq,
-                                      dropout=dropout)
+                                      lstm_dropout=dropouts["lstm"],
+                                      output_dropout=dropouts["lstm_out"])
+
+        # Entity detection layer: Section 3.3
         if end2end:
             self.entity_detection = EntityDetection(
-                entl_vocab_sz=entl_vocab_sz,
+                input_size=self.hs_size,
                 entl_emb_sz=entl_emb_sz,
                 input_sz=hs_size,
-                output_sz=ents_num,
+                output_size=entl_vocab_sz,
                 hidden_sz=ht_size,
-                dropout=dropout,
+                dropout=dropouts["ent_h"],
+                label_dropout=dropouts["ent_label"],
                 entl_pad_value=entl_pad_value)
 
-        if not pretrain:
+        if not pretrain:  # Pretrain mode, section 3.7
+            # Dependency layer Sections 3.4 & 3.5 and relation extraction
+            # section 3.6
             self.tree_input_sz = self.hs_size + dep_emb_sz + self.entl_emb_sz
             rel_clf_input_sz = self.htree_size + 2 * self.hs_size
             self.dep_embeddings = nn.Embedding(dep_vocab_sz,
@@ -86,7 +97,8 @@ class LSTMER(nn.Module):
                                      h_size=htree_size,
                                      bidirectional=bidir_tree)
             self.rel_clf = nn.Sequential(nn.Linear(rel_clf_input_sz, hp_size),
-                                         nn.Tanh(), nn.Dropout(dropout),
+                                         nn.Tanh(),
+                                         nn.Dropout(dropouts["rel_h"]),
                                          nn.Linear(hp_size, rel_num))
 
     def forward(self, batch: List[Tensor], es_tag: Optional[List[int]]):
@@ -100,10 +112,8 @@ class LSTMER(nn.Module):
         bsz = seq.size(0)  # batch size
 
         # section-3.2: Sequence layer
-        seq, pos = self.embeddings(seq, pos)
-        seq_encoded_input = torch.cat((seq, pos), dim=-1)
-        seq_encoded = self.seq_encoder(seq_encoded_input, lens,
-                                       self.padding_values[0])
+        seq_embed = self.embeddings(seq, pos)
+        seq_encoded = self.seq_encoder(seq_embed, lens, self.padding_values[0])
 
         # section-3.3: End to End mode (Entity detection layer)
         if self.end2end:
@@ -163,7 +173,7 @@ class LSTMER(nn.Module):
         # xₜ = [sₜ; vₜᵈ, vₜᵉ]
         xt = [seq_encoded[idx0, tokens_idx], dep[idx0, tokens_idx]]
         # end to end: add the embeddings of predicted entity labels [vₜᵉ]
-        if self.entity_detection:
+        if self.end2end:
             xt.extend(edl_preds[idx0, tokens_idx])
         xt = torch.cat(xt, dim=-1)
         tree.ndata["emb"] = xt
@@ -180,20 +190,22 @@ class LSTMER(nn.Module):
         #     List[num_ents_tokens, hidden_size)], len(list) - batch_size
         e1_hstate = torch.split(
             seq_encoded[e1_idx_tuple],
-            split_size_or_sections=num_e1)  # type: List[Tensor]
+            split_size_or_sections=num_e1.tolist())  # type: List[Tensor]
         e2_hstate = torch.split(
             seq_encoded[e2_idx_tuple],
-            split_size_or_sections=num_e2)  # type: List[Tensor]
+            split_size_or_sections=num_e2.tolist())  # type: List[Tensor]
 
         # (Batch_size, hidden_size), means of entities hidden state across
         # thier tokens
-        e1_hstate = torch.cat([h.mean(dim=0) for h in e1_hstate], dim=0)
-        e2_hstate = torch.cat([h.mean(dim=0) for h in e2_hstate], dim=0)
+        e1_hstate = torch.cat([h.mean(0).unsqueeze(0) for h in e1_hstate],
+                              dim=0)
+        e2_hstate = torch.cat([h.mean(0).unsqueeze(0) for h in e2_hstate],
+                              dim=0)
 
         dp_12_prime = torch.cat((dp_12, e1_hstate, e2_hstate), dim=-1)
-        dp_12_prime = torch.cat((dp_21, e1_hstate, e2_hstate), dim=-1)
+        dp_21_prime = torch.cat((dp_21, e1_hstate, e2_hstate), dim=-1)
 
         hpr_12 = self.rel_clf(dp_12_prime)  # e1->e2 relation preds logits
-        hpr_21 = self.rel_clf(dp_12_prime)  # e2->e1 relation preds logits
+        hpr_21 = self.rel_clf(dp_21_prime)  # e2->e1 relation preds logits
 
         return hpr_12, hpr_21

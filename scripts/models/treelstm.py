@@ -221,7 +221,7 @@ class TreeLSTMCell(nn.Module):
         return {
             "h": edges.src["h"],
             "c": edges.src["c"],
-            "type_n": edges.src["type_n"],
+            "n_type": edges.src["n_type"],
         }
 
     def reduce_func(self, nodes):
@@ -231,7 +231,7 @@ class TreeLSTMCell(nn.Module):
         hidden_size = c_child.size(2)
 
         # Step 1
-        type_n = nodes.mailbox["type_n"]  # (Nt)
+        type_n = nodes.mailbox["n_type"]  # (Nt)
         type_n0_id = type_n == 0
         type_n1_id = type_n == 1
 
@@ -280,8 +280,8 @@ class TreeLSTMCell(nn.Module):
             h_cell = torch.cat((h_cell, h_cell), dim=1)  # (Nt, Nchn*H)
 
         iou = self.W_iou(nodes.data["emb"]) + self.U_iou(h_cell) + self.b_iou
-        iou = [self.norm[i](iou[i]) for i in range(3)]
-        i, o, u = torch.chunk(iou, 3, 1)  # (Nt x H) for each of i,o,u
+        iou = torch.chunk(iou, 3, 1)  # (Nt x H) for each of i,o,u
+        i, o, u  = [self.norm[i](iou[i]) for i in range(3)]
         i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
 
         c = i * u + c_cell
@@ -302,6 +302,7 @@ class TreeLSTM(nn.Module):
         super(TreeLSTM, self).__init__()
 
         self.bidirectional = bidirectional
+        self.h_size = h_size
         self.TeeLSTM_cell = TreeLSTMCell(input_size, h_size)
 
         # learnable initial states
@@ -310,8 +311,8 @@ class TreeLSTM(nn.Module):
     def init_states(self):
         h0 = torch.zeros(1, self.h_size)
         c0 = torch.zeros(1, self.h_size)
-        xavier_normal_(h0, gain=nn.init.calculate_gain("Sigmoid"))
-        xavier_normal_(c0, gain=nn.init.calculate_gain("Sigmoid"))
+        xavier_normal_(h0, gain=nn.init.calculate_gain("sigmoid"))
+        xavier_normal_(c0, gain=nn.init.calculate_gain("sigmoid"))
         self.h0 = nn.Parameter(h0, requires_grad=True)
         self.c0 = nn.Parameter(c0, requires_grad=True)
 

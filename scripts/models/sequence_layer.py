@@ -12,7 +12,8 @@ class SeqEncoder(nn.Module):
                  input_size: int,
                  h_size: int,
                  num_layers: int,
-                 dropout: float,
+                 lstm_dropout: float,
+                 output_dropout: float,
                  bidirectional: bool = True):
         super(SeqEncoder, self).__init__()
 
@@ -25,8 +26,9 @@ class SeqEncoder(nn.Module):
                             num_layers=num_layers,
                             bidirectional=bidirectional,
                             batch_first=True,
-                            dropout=dropout if num_layers > 1 else 0)
-        self.dropout = nn.Dropout(dropout)
+                            dropout=lstm_dropout if num_layers > 1 else 0)
+
+        self.dropout = nn.Dropout(output_dropout)
         # learnable initial states
         self.init_states()
 
@@ -34,14 +36,15 @@ class SeqEncoder(nn.Module):
         state_size = self.num_layers * self.num_dir
         h0 = torch.zeros(state_size, 1, self.h_size)
         c0 = torch.zeros(state_size, 1, self.h_size)
-        xavier_normal_(h0, gain=nn.init.calculate_gain("Tanh"))
-        xavier_normal_(c0, gain=nn.init.calculate_gain("Tanh"))
+        xavier_normal_(h0, gain=nn.init.calculate_gain("sigmoid"))
+        xavier_normal_(c0, gain=nn.init.calculate_gain("sigmoid"))
         self.h0 = nn.Parameter(h0, requires_grad=True)
         self.c0 = nn.Parameter(c0, requires_grad=True)
 
     def forward(self, seq: Tensor, lengths: Tensor, padding_value: float):
 
         b_sz = seq.size(0)
+        lengths = lengths.cpu()
 
         x_packed = pack_padded_sequence(seq, lengths=lengths, batch_first=True)
 

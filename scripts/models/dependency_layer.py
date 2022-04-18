@@ -5,19 +5,19 @@ from dgl import DGLGraph
 import torch
 import torch.nn as nn
 
-from models.treelstm import TreeLSTM
+from .treelstm import TreeLSTM
 
 
 class DepLayer(nn.Module):
 
     def __init__(self,
                  input_size: int,
-                 tree_h_size: int,
-                 tree_bidir: bool = True):
+                 h_size: int,
+                 bidirectional: bool = True):
         super(DepLayer, self).__init__()
         self.deptree = TreeLSTM(input_size=input_size,
-                                h_size=tree_h_size,
-                                bidirectional=tree_bidir)
+                                h_size=h_size,
+                                bidirectional=bidirectional)
 
     def forward(self, g: DGLGraph):
         hp = self.deptree(g)  # type: Tensor
@@ -28,7 +28,7 @@ class DepLayer(nn.Module):
         # ↓hp2: hidden state of the second token in the candidate pair
         # get ids of roots and tokens in relation
         num_dir = 2 if self.deptree.bidirectional else 1
-        h_size = hp.size(-1)
+        h_size = hp.size(-1) // num_dir
         hp = hp.view(-1, num_dir, h_size)
 
         e1_nidx = g.ndata["e1"] == 1
@@ -42,6 +42,6 @@ class DepLayer(nn.Module):
             root = g.ndata["root"] == 1
             hpA = hp[root, 1, :].squeeze()  # ↑hpA
             hp_d12 = torch.cat((hpA, hp_d12), dim=-1)  # relation from e1 to e2
-            hp_d12 = torch.cat((hpA, hp_d21), dim=-1)  # relation from e1 to e2
+            hp_d21 = torch.cat((hpA, hp_d21), dim=-1)  # relation from e1 to e2
 
         return hp_d12, hp_d21

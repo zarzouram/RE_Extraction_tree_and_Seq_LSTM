@@ -12,6 +12,7 @@ class EntityDetection(nn.Module):
         output_sz: int,
         hidden_sz: int,
         dropout: float,
+        label_dropout: float,
         entl_pad_value: float,
     ):
         super(EntityDetection, self).__init__()

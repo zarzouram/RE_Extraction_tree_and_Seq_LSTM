@@ -1,5 +1,6 @@
-from typing import Tuple
 from torch import Tensor
+
+import torch
 import torch.nn as nn
 
 
@@ -19,7 +20,8 @@ class EmbeddingLayer(nn.Module):
                                            padding_idx=pos_pad_value)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, tokens: Tensor, pos: Tensor) -> Tuple(Tensor, Tensor):
+    def forward(self, tokens: Tensor, pos: Tensor) -> Tensor:
 
-        return (self.dropout(self.token_embeddings(tokens)),
-                self.dropout(self.pos_embeddings(pos)))
+        tokens = self.token_embeddings(tokens)
+        pos = self.pos_embeddings(pos)
+        return self.dropout(torch.cat((tokens, pos), dim=-1))
