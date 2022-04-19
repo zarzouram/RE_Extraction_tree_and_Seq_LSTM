@@ -125,7 +125,7 @@ class LSTMER(nn.Module):
 
             # entity detection pretraining
             if self.pretrain:
-                return edl_logits, edl_preds, None, None
+                return edl_logits, edl_preds
 
         # section-3.4: dependency layer
         dep = self.dep_embeddings(dep)

@@ -1,4 +1,6 @@
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Tuple, Union
+from torch import Tensor
+
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
@@ -53,15 +55,20 @@ class Trainer():
         # rels vocabs
         self.rels_vocab = rels_vocab
         self.rels_dir = rels_dir_str
-        self.rel_dir_idx = rel_dir_idx
-        self.neg_rel = neg_rel
+        self.rel_dir_idx = rel_dir_idx  # nodir, dir_12, dir_21
+        self.neg_rel = rels_vocab[neg_rel]
 
         # criterion, optims and schedulers
         self.end2end = modes["end2end"]
-        if self.end2end:
+        self.pretrain = modes["pretrain"]
+        if self.end2end or self.pretrain:
+            # entity detection loss
             self.ent_labrl_criterion = nn.CrossEntropyLoss(
                 ignore_index=self.pad_val).to(device)
-        self.rels_criterion = nn.CrossEntropyLoss().to(device)
+        elif not self.pretrain:
+            # relation extraction loss
+            self.rels_criterion = nn.CrossEntropyLoss().to(device)
+
         self.optim = optim
         self.cheduler = scheduler
         self.grad_clip_c = grad_clip  # gradient clip coeffecient
@@ -83,7 +90,8 @@ class Trainer():
         checkpoints_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoints_path = str(checkpoints_dir)
 
-    def get_ground_truth(self, rels, rels_dir):
+    def get_ground_truth(self, rels: Tensor,
+                         rels_dir: Tensor) -> Tuple[Tensor, Tensor]:
         gt_12 = torch.zeros_like(rels)
         gt_21 = torch.zeros_like(rels)
 
@@ -102,6 +110,46 @@ class Trainer():
 
         return gt_12, gt_21
 
+    def get_predictions(self, logits_12: Tensor, logits_21: Tensor) -> Tensor:
+        rel_preds = torch.zeros_like(logits_12)
+        logits_12p = logits_12.clone().requires_grad(False)
+        logits_21p = logits_21.clone().requires_grad(False)
+
+        preds_12 = torch.argmax(logits_12p, dim=-1)
+        preds_21 = torch.argmax(logits_21p, dim=-1)
+
+        # predict negative relations when both 12 and 21 directions are
+        # negative relation, otherwise take the max
+        neg_rel12 = preds_12 == self.neg_rel  # negative relations in dir 12
+        neg_rel21 = preds_21 == self.neg_rel  # negative relations in dir 21
+        nneg_rels = torch.bitwise_or(~neg_rel12, ~neg_rel21)  # non negative
+
+        neg_rel_preds = torch.nonzero(torch.bitwise_and(neg_rel12, neg_rel21))
+        rel_preds[neg_rel_preds] = preds_12[neg_rel_preds]
+
+        # remove the neg_relation from logits, then get prediction
+        logits_12_nneg = torch.hstack(logits_12p[:, :self.neg_rel],
+                                      logits_12p[:, self.neg_rel + 1:])
+        logits_21_nneg = torch.hstack(logits_21p[:, :self.neg_rel],
+                                      logits_21p[:, self.neg_rel + 1:])
+        probs_12, preds_12 = torch.argmax(logits_12_nneg, dim=-1)
+        probs_21, preds_21 = torch.argmax(logits_21_nneg, dim=-1)
+        probs = torch.hstack((probs_12, probs_21))
+
+        # predections for non negative relation
+        preds = torch.argmax(probs)
+        rel_preds[nneg_rels] = preds[nneg_rels]
+
+        # direction prediction
+        dir_preds = (preds > logits_12.size(-1)).type(probs.dtype)
+        dir_12 = dir_preds == 0
+        dir_21 = dir_preds == 1
+        dir_preds[dir_12] = self.rel_dir_idx[1]
+        dir_preds[dir_21] = self.rel_dir_idx[2]
+        dir_preds[neg_rel_preds] = self.rel_dir_idx[0]
+
+        return rel_preds, dir_preds
+
     def run(self, model: torch.nn.Module,
             data_iters: List[torch.utils.data.DataLoader], seed: int):
 
@@ -111,12 +159,11 @@ class Trainer():
 
         model = model.to(self.device)
 
-        # start
+        # start training
         model.train()
         main_pb = tqdm(range(self.epochs_num), unit="epoch")
-        r = 0.
-        for self.epoch in range(self.epochs_num):
-            main_pb.set_description(f"loss: {r:.3f}")
+        for self.epoch in main_pb:
+            main_pb.set_description("Training")
 
             pb = tqdm(data_iters[0],
                       leave=False,
@@ -125,13 +172,35 @@ class Trainer():
             for step, batch in enumerate(pb):
                 # set progress bar description and metrics
                 pb.set_description(f"train: Step-{step+1:<3d}")
+                # move data to device
                 batch = [b.to(self.device) for b in batch]
+
                 self.optim.zero_grad()
-                logits12, logits21 = model(batch, self.es_tag)
+                outputs = model(batch, self.es_tag)
+
+                # get groung truth
                 gt_12, gt_21 = self.get_ground_truth(*batch[-2:])
                 gt = torch.hstack((gt_12, gt_21))
-                logits = torch.vstack((logits12, logits21))
-                loss = self.rels_criterion(logits, gt)
+
+                if self.pretrain or self.end2end:
+                    # calculate entity detection loss
+                    # outputs = edl_logits, edl_preds
+                    raise NotImplementedError
+
+                if not self.pretrain:
+                    logits12, logits21 = outputs
+                    rel_logits = torch.vstack((logits12, logits21))
+
+                    # calcuate loss, metics scors
+                    loss = self.rels_criterion(rel_logits, gt)
+
+                    # get predections
+                    rel_preds, dir_preds = self.get_predictions(
+                        logits12, logits21)
+
+                    if self.end2end:
+                        # loss = loss + entity detection loss
+                        raise NotImplementedError
+
                 loss.backward()
-                r = loss.item()
                 self.optim.step()
