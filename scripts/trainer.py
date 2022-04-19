@@ -135,10 +135,9 @@ class Trainer():
         rel_preds = torch.argmax(probs)
 
         # direction prediction
-        dir_preds = (rel_preds > logits_12.size(-1)).type(torch.long)
-        dir_12 = dir_preds == 0
-        dir_21 = dir_preds == 1
-        dir_preds[dir_12] = self.rel_dir_idx[1]
+        dir_preds = torch.zeros_like(rel_preds)
+        dir_21 = rel_preds > logits_12.size(-1)
+        dir_preds[~dir_21] = self.rel_dir_idx[1]
         dir_preds[dir_21] = self.rel_dir_idx[2]
         dir_preds[neg_rels] = self.rel_dir_idx[0]
 
