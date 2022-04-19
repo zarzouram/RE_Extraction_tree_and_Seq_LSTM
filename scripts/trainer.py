@@ -13,6 +13,7 @@ from torchtext.vocab.vocab import Vocab
 from torch.utils.tensorboard import SummaryWriter
 
 from scripts.utils.utils import seed_everything
+from scripts.metrics import TrackMetrics
 
 
 class Trainer():
@@ -33,6 +34,9 @@ class Trainer():
                  rels_dir_str: List[str],
                  rel_dir_idx: List[int],
                  neg_rel: str,
+                 scorer_path: str,
+                 key_answers_path: str,
+                 results_path: str,
                  resume: Optional[str] = None) -> None:
 
         super(Trainer, self).__init__()
@@ -89,6 +93,17 @@ class Trainer():
         checkpoints_dir = Path(checkpoints_dir) / f"{time_tag}"  # type: Path
         checkpoints_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoints_path = str(checkpoints_dir)
+
+        self.metrics_tracker = TrackMetrics(scorer_path, results_path,
+                                            key_answers_path)
+        self.results_path = results_path
+        self.key_answers_path = key_answers_path
+
+    def write_key_answers(self, gt: Tensor):
+        pass
+
+    def write_answers(self, rel_preds: Tensor, dir_preds: Tensor):
+        pass
 
     def get_ground_truth(self, rels: Tensor,
                          rels_dir: Tensor) -> Tuple[Tensor, Tensor]:
@@ -202,3 +217,5 @@ class Trainer():
 
                 loss.backward()
                 self.optim.step()
+
+                self.tr
