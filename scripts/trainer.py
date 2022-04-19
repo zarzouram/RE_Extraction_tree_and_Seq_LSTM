@@ -111,42 +111,40 @@ class Trainer():
         return gt_12, gt_21
 
     def get_predictions(self, logits_12: Tensor, logits_21: Tensor) -> Tensor:
-        rel_preds = torch.zeros_like(logits_12)
         logits_12p = logits_12.clone().requires_grad(False)
         logits_21p = logits_21.clone().requires_grad(False)
 
-        preds_12 = torch.argmax(logits_12p, dim=-1)
-        preds_21 = torch.argmax(logits_21p, dim=-1)
+        # Get predections in both directions
+        preds_12_wneg = torch.argmax(logits_12p, dim=-1)
+        preds_21_wneg = torch.argmax(logits_21p, dim=-1)
 
-        # predict negative relations when both 12 and 21 directions are
-        # negative relation, otherwise take the max
-        neg_rel12 = preds_12 == self.neg_rel  # negative relations in dir 12
-        neg_rel21 = preds_21 == self.neg_rel  # negative relations in dir 21
-        nneg_rels = torch.bitwise_or(~neg_rel12, ~neg_rel21)  # non negative
+        # predicts negative relations iff both 12 and 21 directions are
+        # negative relation, otherwise take the max prob of non negative rel
+        neg_rel12 = preds_12_wneg == self.neg_rel  # neg relations in dir 12
+        neg_rel21 = preds_21_wneg == self.neg_rel  # neg relations in dir 21
+        neg_rels = torch.bitwise_and(neg_rel12, neg_rel21)
 
-        neg_rel_preds = torch.nonzero(torch.bitwise_and(neg_rel12, neg_rel21))
-        rel_preds[neg_rel_preds] = preds_12[neg_rel_preds]
-
-        # remove the neg_relation from logits, then get prediction
-        logits_12_nneg = torch.hstack(logits_12p[:, :self.neg_rel],
-                                      logits_12p[:, self.neg_rel + 1:])
-        logits_21_nneg = torch.hstack(logits_21p[:, :self.neg_rel],
-                                      logits_21p[:, self.neg_rel + 1:])
-        probs_12, preds_12 = torch.argmax(logits_12_nneg, dim=-1)
-        probs_21, preds_21 = torch.argmax(logits_21_nneg, dim=-1)
+        # remove the neg_relation from logits, then get predictions
+        logits_12p[:, self.neg_rel] = -1 * torch.inf
+        logits_21p[:, self.neg_rel] = -1 * torch.inf
+        probs_12, _ = torch.argmax(logits_12p, dim=-1)
+        probs_21, _ = torch.argmax(logits_21p, dim=-1)
         probs = torch.hstack((probs_12, probs_21))
 
         # predections for non negative relation
-        preds = torch.argmax(probs)
-        rel_preds[nneg_rels] = preds[nneg_rels]
+        rel_preds = torch.argmax(probs)
 
         # direction prediction
-        dir_preds = (preds > logits_12.size(-1)).type(probs.dtype)
+        dir_preds = (rel_preds > logits_12.size(-1)).type(torch.long)
         dir_12 = dir_preds == 0
         dir_21 = dir_preds == 1
         dir_preds[dir_12] = self.rel_dir_idx[1]
         dir_preds[dir_21] = self.rel_dir_idx[2]
-        dir_preds[neg_rel_preds] = self.rel_dir_idx[0]
+        dir_preds[neg_rels] = self.rel_dir_idx[0]
+
+        # relation predictions, idx
+        rel_preds[dir_21] = rel_preds[dir_21] - logits_12.size(0)
+        rel_preds[neg_rels] = preds_12_wneg[neg_rels]
 
         return rel_preds, dir_preds
 
@@ -200,6 +198,7 @@ class Trainer():
 
                     if self.end2end:
                         # loss = loss + entity detection loss
+                        # change predictions according to section 3.6
                         raise NotImplementedError
 
                 loss.backward()
