@@ -29,6 +29,10 @@ if __name__ == "__main__":
     w2vm_path = args.word2vec_path
     resume = args.resume if args.resume != "" else None
 
+    scorer_path = str(Path(args.scorer_path).resolve().expanduser())
+    key_answers_path = Path(args.scorer_result_dir) / "answer_key.txt"
+    results_path = Path(args.scorer_result_dir) / "proposed_answer.txt"
+
     # device
     device = select_device(args.device)
     print(f"selected device is {device}.\n")
@@ -130,5 +134,8 @@ if __name__ == "__main__":
                     rels_dir_str=rels_dir,
                     rel_dir_idx=[ndir, rel_12, rel_21],
                     neg_rel=config["dataset"]["tags"]["rel"]["neg_rel"],
+                    results_path=str(results_path),
+                    scorer_path=scorer_path,
+                    key_answers_path=str(key_answers_path),
                     **config["train_parms"])
     train.run(model, [train_loader, val_loader], seed)

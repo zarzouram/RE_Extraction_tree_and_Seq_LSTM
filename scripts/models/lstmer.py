@@ -89,7 +89,7 @@ class LSTMER(nn.Module):
             # Dependency layer Sections 3.4 & 3.5 and relation extraction
             # section 3.6
             self.tree_input_sz = self.hs_size + dep_emb_sz + self.entl_emb_sz
-            rel_clf_input_sz = self.htree_size + 2 * self.hs_size
+            rel_clf_input_sz = (self.htree_size + 2 * self.hs_size) * 2
             self.dep_embeddings = nn.Embedding(dep_vocab_sz,
                                                dep_emb_sz,
                                                padding_idx=dep_pad_value)
@@ -99,7 +99,7 @@ class LSTMER(nn.Module):
             self.rel_clf = nn.Sequential(nn.Linear(rel_clf_input_sz, hp_size),
                                          nn.Tanh(),
                                          nn.Dropout(dropouts["rel_h"]),
-                                         nn.Linear(hp_size, rel_num))
+                                         nn.Linear(hp_size, rel_num * 2))
 
     def forward(self, batch: List[Tensor], es_tag: Optional[List[int]]):
 
@@ -186,8 +186,8 @@ class LSTMER(nn.Module):
         _, num_e1 = torch.unique(e1_idx_tuple[0], return_counts=True)
         _, num_e2 = torch.unique(e2_idx_tuple[0], return_counts=True)
 
-        # (Batch_size x num_ents_tokens, hidden_size) -->
-        #     List[num_ents_tokens, hidden_size)], len(list) - batch_size
+        # (total_num_ents_tokens, hidden_size) -->
+        #   List[num_ents_tokens_batch, hidden_size)], len(list) - batch_size
         e1_hstate = torch.split(
             seq_encoded[e1_idx_tuple],
             split_size_or_sections=num_e1.tolist())  # type: List[Tensor]
@@ -204,8 +204,9 @@ class LSTMER(nn.Module):
 
         dp_12_prime = torch.cat((dp_12, e1_hstate, e2_hstate), dim=-1)
         dp_21_prime = torch.cat((dp_21, e1_hstate, e2_hstate), dim=-1)
+        dp_rel = torch.cat((dp_12_prime, dp_21_prime), dim=-1)
 
-        hpr_12 = self.rel_clf(dp_12_prime)  # e1->e2 relation preds logits
-        hpr_21 = self.rel_clf(dp_21_prime)  # e2->e1 relation preds logits
+        hp_rel = self.rel_clf(dp_rel)
+        hpr_12, hpr_21 = torch.chunk(hp_rel, chunks=2, dim=-1)
 
         return hpr_12, hpr_21

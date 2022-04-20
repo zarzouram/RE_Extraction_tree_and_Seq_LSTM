@@ -29,6 +29,18 @@ def parse_arguments():
                         help="Directory to save checkpoints.")
 
     parser.add_argument(
+        "--scorer_path",
+        type=str,
+        default=  # noqa: E251
+        "dataset/semeval_task8/SemEval2010_task8_scorer-v1.2/semeval2010_task8_scorer-v1.2.pl",  # noqa: E501
+        help="Path to the official scorer path.")
+
+    parser.add_argument("--scorer_result_dir",
+                        type=str,
+                        default="dataset/semeval_task8",
+                        help="Directory to save temporary scorer results.")
+
+    parser.add_argument(
         "--word2vec_path",
         type=str,
         default=  # noqa: E251

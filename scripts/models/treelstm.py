@@ -279,8 +279,9 @@ class TreeLSTMCell(nn.Module):
             # NOTE: initialization for node type-0 == node type-1
             h_cell = torch.cat((h_cell, h_cell), dim=1)  # (Nt, Nchn*H)
 
+        # (Nt x 3*H)
         iou = self.W_iou(nodes.data["emb"]) + self.U_iou(h_cell) + self.b_iou
-        iou = torch.chunk(iou, 3, 1)  # (Nt x H) for each of i,o,u
+        iou = torch.chunk(iou, chunks=3, dim=1)  # (Nt x H) for each of i,o,u
         i, o, u  = [self.norm[i](iou[i]) for i in range(3)]
         i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
 

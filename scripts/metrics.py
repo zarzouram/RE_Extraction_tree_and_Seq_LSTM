@@ -67,6 +67,7 @@ class TrackMetrics:
         # run official scorer code
         result = subprocess.check_output([self.scrr_p, self.rp, self.akp])
         result = result.decode("utf-8")
+        result = result.split(self.official_res)[-1]
 
         # get precision, recall, f1 scores
         result_prf = self.prf_pattern.search(result)
