@@ -65,7 +65,8 @@ class TrackMetrics:
 
     def calculate_scores(self, phase: str):
         # run official scorer code
-        result = subprocess.check_output([self.scrr_p, self.rp, self.akp])
+        result = subprocess.check_output([self.scrr_p, self.rp, self.akp],
+                                         stderr=subprocess.STDOUT)
         result = result.decode("utf-8")
         result = result.split(self.official_res)[-1]
 

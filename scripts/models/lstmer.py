@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Dict, List, Optional
 from torch import Tensor
 
@@ -5,6 +6,7 @@ from dgl import DGLGraph
 
 import torch
 import torch.nn as nn
+from torch.nn.init import xavier_uniform_, calculate_gain
 
 from .embeddinglayer import EmbeddingLayer
 from .sequence_layer import SeqEncoder
@@ -96,10 +98,23 @@ class LSTMER(nn.Module):
             self.dep_tree = DepLayer(input_size=self.tree_input_sz,
                                      h_size=htree_size,
                                      bidirectional=bidir_tree)
-            self.rel_clf = nn.Sequential(nn.Linear(rel_clf_input_sz, hp_size),
-                                         nn.Tanh(),
-                                         nn.Dropout(dropouts["rel_h"]),
-                                         nn.Linear(hp_size, rel_num * 2))
+            # relation classification (12, 21)
+            self.rel_clf = nn.Sequential(
+                OrderedDict([("hp1", nn.Linear(rel_clf_input_sz, hp_size)),
+                             ("tanhp", nn.Tanh()),
+                             ("dropoutp", nn.Dropout(dropouts["rel_h"])),
+                             ("hp2", nn.Linear(hp_size, rel_num * 2))]))
+            self.init_clf()
+
+    def init_clf(self):
+        w_y, w_x = self.rel_clf[0].weight.data.size()
+        w1 = torch.zeros(w_y, w_x // 2)
+        w2 = torch.zeros(w_y, w_x // 2)
+        xavier_uniform_(w1, gain=calculate_gain("tanh"))
+        xavier_uniform_(w2, gain=calculate_gain("tanh"))
+        w = nn.Parameter(torch.cat((w1, w2), dim=-1), requires_grad=True)
+        self.rel_clf[0].weight.data = w
+        self.rel_clf[0].bias.data.fill_(0)
 
     def forward(self, batch: List[Tensor], es_tag: Optional[List[int]]):
 

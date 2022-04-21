@@ -93,3 +93,11 @@ def get_w2v_vectors(vocab: Vocab, w2v_model_path: str):
             vectors.append(w2v_vectors[idx])
 
     return torch.stack(vectors)
+
+
+def next_layer(named_layer_list):
+    for name, layer in named_layer_list:
+        if list(layer.children()):
+            yield from next_layer(layer.named_children())
+        else:
+            yield name, layer

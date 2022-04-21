@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 import torch
 from torch import nn
+from torch.nn.functional import log_softmax
 
 from torchtext.vocab.vocab import Vocab
 
@@ -99,14 +100,36 @@ class Trainer():
         self.results_path = results_path
         self.key_answers_path = key_answers_path
 
-    def write_key_answers(self, gt: Tensor):
-        pass
+    def write_key_answers(self, idx: Tensor, rel_gt: Tensor, dir_gt: Tensor):
+        rel_str = self.rels_vocab.lookup_tokens(rel_gt.tolist())
+        dir_str = [
+            self.rels_dir[d] if d != self.rel_dir_idx[0] else ""
+            for d in dir_gt
+        ]
 
-    def write_answers(self, rel_preds: Tensor, dir_preds: Tensor):
-        pass
+        answer_key_str = ""
+        for i, r, d in zip(idx.tolist(), rel_str, dir_str):
+            answer_key_str += f"{str(i)}\t{r}{d}\n"
 
-    def get_ground_truth(self, rels: Tensor,
-                         rels_dir: Tensor) -> Tuple[Tensor, Tensor]:
+        with open(self.key_answers_path, "w") as f:
+            f.write(answer_key_str)
+
+    def write_answers(self, idx: Tensor, rel_preds: Tensor, dir_preds: Tensor):
+        rel_str = self.rels_vocab.lookup_tokens(rel_preds.tolist())
+        dir_str = [
+            self.rels_dir[d] if d != self.rel_dir_idx[0] else ""
+            for d in dir_preds
+        ]
+
+        proposed_answer_str = ""
+        for i, r, d in zip(idx.tolist(), rel_str, dir_str):
+            proposed_answer_str += f"{str(i)}\t{r}{d}\n"
+
+        with open(self.results_path, "w") as f:
+            f.write(proposed_answer_str)
+
+    def get_dir_ground_truth(self, rels: Tensor,
+                             rels_dir: Tensor) -> Tuple[Tensor, Tensor]:
         # initialize grounf truth with no dir
         gt_12 = torch.zeros_like(rels) + self.rel_dir_idx[0]
         gt_21 = torch.zeros_like(rels) + self.rel_dir_idx[0]
@@ -123,12 +146,13 @@ class Trainer():
 
     def get_predictions(self, logits_12: Tensor, logits_21: Tensor) -> Tensor:
         with torch.no_grad():
-            logits_12p = logits_12.clone()  # (num_pair x num_rels)
-            logits_21p = logits_21.clone()  # (num_pair x num_rels)
+
+            prob_12 = log_softmax(logits_12, dim=-1)  # (num_pair x num_rels)
+            prob_21 = log_softmax(logits_21, dim=-1)  # (num_pair x num_rels)
 
             # Get predections in both directions
-            preds_12_wneg = torch.argmax(logits_12p, dim=-1)
-            preds_21_wneg = torch.argmax(logits_21p, dim=-1)
+            preds_12_wneg = torch.argmax(prob_12, dim=-1)
+            preds_21_wneg = torch.argmax(prob_21, dim=-1)
 
             # predicts negative relations iff both 12 and 21 directions are
             # negative relation, otherwise take the max prob of non negative rel
@@ -137,11 +161,12 @@ class Trainer():
             neg_rels = torch.bitwise_and(neg_rel12, neg_rel21)
 
             # remove the neg_relation from logits, then get predictions
-            logits_12p[:, self.neg_rel] = -1 * torch.inf
-            logits_21p[:, self.neg_rel] = -1 * torch.inf
-            probs_12, rel_preds_12 = torch.max(logits_12p, dim=-1)
-            probs_21, rel_preds_21 = torch.max(logits_21p, dim=-1)
-            probs = torch.stack((probs_12, probs_21), dim=-1)  # (num_pair x 2)
+            prob_12p, prob_21p = prob_12.clone(), prob_21.clone()
+            prob_12p[:, self.neg_rel] = -1 * torch.inf
+            prob_21p[:, self.neg_rel] = -1 * torch.inf
+            probs_max12, rel_preds_12 = torch.max(prob_12p, dim=-1)
+            probs_max21, rel_preds_21 = torch.max(prob_21p, dim=-1)
+            probs = torch.stack((probs_max12, probs_max21), dim=-1)
             rel_preds_2dirs = torch.stack((rel_preds_12, rel_preds_21), dim=-1)
 
             # predections for non negative relation
@@ -181,7 +206,7 @@ class Trainer():
                       unit="step")
             for step, batch in enumerate(pb):
                 # set progress bar description and metrics
-                pb.set_description(f"train: Step-{step+1:<3d}")
+                pb.set_description(f"train: Step-{step:<3d}")
                 # move data to device
                 batch = [b.to(self.device) for b in batch]
 
@@ -189,7 +214,7 @@ class Trainer():
                 outputs = model(batch, self.es_tag)
 
                 # get groung truth
-                gt_12, gt_21 = self.get_ground_truth(*batch[-2:])
+                gt_12, gt_21 = self.get_dir_ground_truth(*batch[-2:])
 
                 if self.pretrain or self.end2end:
                     # calculate entity detection loss
@@ -215,3 +240,10 @@ class Trainer():
 
                 loss.backward()
                 self.optim.step()
+
+                samples_ids = batch[0]
+                self.write_key_answers(samples_ids, *batch[-2:])
+                self.write_answers(samples_ids, rel_preds, dir_preds)
+                self.metrics_tracker.calculate_scores("train")
+                self.metrics_tracker.update_running({"loss": loss.item()},
+                                                    "train")

@@ -194,7 +194,7 @@ E. TreeLSTMCell Impelementation:
 # pytorch
 import torch
 import torch.nn as nn
-from torch.nn.init import xavier_normal_
+from torch.nn.init import xavier_uniform_
 
 # DGL
 import dgl
@@ -312,8 +312,8 @@ class TreeLSTM(nn.Module):
     def init_states(self):
         h0 = torch.zeros(1, self.h_size)
         c0 = torch.zeros(1, self.h_size)
-        xavier_normal_(h0, gain=nn.init.calculate_gain("sigmoid"))
-        xavier_normal_(c0, gain=nn.init.calculate_gain("sigmoid"))
+        xavier_uniform_(h0, gain=nn.init.calculate_gain("sigmoid"))
+        xavier_uniform_(c0, gain=nn.init.calculate_gain("sigmoid"))
         self.h0 = nn.Parameter(h0, requires_grad=True)
         self.c0 = nn.Parameter(c0, requires_grad=True)
 

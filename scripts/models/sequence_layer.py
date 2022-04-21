@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn.init import xavier_normal_
+from torch.nn.init import xavier_uniform_, calculate_gain
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn.utils.rnn import pad_packed_sequence
 from torch import Tensor
@@ -36,8 +36,8 @@ class SeqEncoder(nn.Module):
         state_size = self.num_layers * self.num_dir
         h0 = torch.zeros(state_size, 1, self.h_size)
         c0 = torch.zeros(state_size, 1, self.h_size)
-        xavier_normal_(h0, gain=nn.init.calculate_gain("sigmoid"))
-        xavier_normal_(c0, gain=nn.init.calculate_gain("sigmoid"))
+        xavier_uniform_(h0, gain=calculate_gain("sigmoid"))
+        xavier_uniform_(c0, gain=calculate_gain("sigmoid"))
         self.h0 = nn.Parameter(h0, requires_grad=True)
         self.c0 = nn.Parameter(c0, requires_grad=True)
 

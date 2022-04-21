@@ -16,6 +16,7 @@ from scripts.trainer import Trainer
 from scripts.utils.utils import seed_everything
 from scripts.utils.gpu_cuda_helper import select_device
 from scripts.utils.train_utils import parse_arguments, get_w2v_vectors
+from scripts.utils.train_utils import next_layer
 
 from dgl.base import DGLWarning
 
@@ -93,6 +94,8 @@ if __name__ == "__main__":
                    dropouts=model_hyp["dropouts"])
     model.embeddings.token_embeddings.from_pretrained(w2v_vectors,
                                                       freeze=False)
+    print(list(next_layer(model.named_children())))
+
     # Optimizer, scheduler
     lr = config["optim_params"]["lr"]
     l2reg = config["optim_params"]["l2reg"]
