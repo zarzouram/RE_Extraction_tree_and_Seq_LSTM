@@ -76,14 +76,14 @@ class LSTMER(nn.Module):
                                       output_dropout=dropouts["lstm_out"])
 
         # Entity detection layer: Section 3.3
-        if end2end:
+        if end2end or pretrain:
+            ent_detect_input_sz = self.hs_size + entl_emb_sz
             self.entity_detection = EntityDetection(
-                input_size=self.hs_size,
+                entl_vocab_sz=entl_vocab_sz,
                 entl_emb_sz=entl_emb_sz,
-                input_sz=hs_size,
-                output_size=entl_vocab_sz,
+                input_sz=ent_detect_input_sz,
                 hidden_sz=ht_size,
-                dropout=dropouts["ent_h"],
+                hidden_dropout=dropouts["ent_h"],
                 label_dropout=dropouts["ent_label"],
                 entl_pad_value=entl_pad_value)
 
@@ -91,7 +91,7 @@ class LSTMER(nn.Module):
             # Dependency layer Sections 3.4 & 3.5 and relation extraction
             # section 3.6
             self.tree_input_sz = self.hs_size + dep_emb_sz + self.entl_emb_sz
-            rel_clf_input_sz = (self.htree_size + 2 * self.hs_size) * 2
+            rel_clf_input_sz = self.htree_size + 2 * self.hs_size
             self.dep_embeddings = nn.Embedding(dep_vocab_sz,
                                                dep_emb_sz,
                                                padding_idx=dep_pad_value)
@@ -100,21 +100,16 @@ class LSTMER(nn.Module):
                                      bidirectional=bidir_tree)
             # relation classification (12, 21)
             self.rel_clf = nn.Sequential(
-                OrderedDict([("hp1", nn.Linear(rel_clf_input_sz, hp_size)),
+                OrderedDict([("hp1", nn.Linear(rel_clf_input_sz * 2, hp_size)),
                              ("tanhp", nn.Tanh()),
                              ("dropoutp", nn.Dropout(dropouts["rel_h"])),
                              ("hp2", nn.Linear(hp_size, rel_num * 2))]))
             self.init_clf()
 
     def init_clf(self):
-        w_y, w_x = self.rel_clf[0].weight.data.size()
-        w1 = torch.zeros(w_y, w_x // 2)
-        w2 = torch.zeros(w_y, w_x // 2)
-        xavier_uniform_(w1, gain=calculate_gain("tanh"))
-        xavier_uniform_(w2, gain=calculate_gain("tanh"))
-        w = nn.Parameter(torch.cat((w1, w2), dim=-1), requires_grad=True)
-        self.rel_clf[0].weight.data = w
-        self.rel_clf[0].bias.data.fill_(0)
+        xavier_uniform_(self.rel_clf[0].weight.data,
+                        gain=calculate_gain("tanh"))
+        self.rel_clf[0].bias.data.fill_(0.)
 
     def forward(self, batch: List[Tensor], es_tag: Optional[List[int]]):
 
@@ -131,16 +126,13 @@ class LSTMER(nn.Module):
         seq_encoded = self.seq_encoder(seq_embed, lens, self.padding_values[0])
 
         # section-3.3: End to End mode (Entity detection layer)
-        if self.end2end:
-            # TODO: calculate epsilon using inverse sigmoid decay
-            # ref. section 3.7. Make a class that have number of epochs
-            # increased every training epoch
-            epsilon = self.k
-            edl_logits, edl_preds = self.entity_detection(seq, epsilon)
+        if self.end2end or self.pretrain:
+            ent_outputs = self.entity_detection(seq_encoded)
+            ent_logits, ent_preds, ent_probs, ent_preds_emb = ent_outputs
 
             # entity detection pretraining
             if self.pretrain:
-                return edl_logits, edl_preds
+                return None, None, ent_logits, ent_preds, ent_probs
 
         # section-3.4: dependency layer
         dep = self.dep_embeddings(dep)
@@ -148,10 +140,13 @@ class LSTMER(nn.Module):
         # Not pretraining and End to End
         if self.end2end:
             # TODO;
+            # calculate epsilon using inverse sigmoid decay
+            # ref. section 3.7. Make a class that have number of epochs
+            # increased every training epoch
+            # if self.training:
+            #   epsilon = self.k
             # BIOUL decode, get entity tokens indices from entity predictions
             # construct pair candidates, get dependency tree
-            # Need the following;
-            # tree, idx0, tokens_idx, e1_idx_tuple, e2_idx_tuple
             raise NotImplementedError
 
         # Not pretraining and not End to End
@@ -170,9 +165,10 @@ class LSTMER(nn.Module):
                 tokens_idx = tree.ndata["ID"]
             elif self.tree_type == "full_tree":
                 tree = batch[6]  # type: DGLGraph
+                num_nodes = tree._batch_num_nodes["_N"].cpu()
                 # indices for all nodes
-                idx0 = slice(None)
-                tokens_idx = slice(None)
+                idx0 = torch.repeat_interleave(torch.arange(bsz), num_nodes)
+                tokens_idx = torch.cat([torch.arange(x) for x in lens])
             elif self.tree_type == "sub_tree":
                 # TODO: implement subtree
                 # indices for all nodes in the subtree
@@ -189,11 +185,14 @@ class LSTMER(nn.Module):
         xt = [seq_encoded[idx0, tokens_idx], dep[idx0, tokens_idx]]
         # end to end: add the embeddings of predicted entity labels [vₜᵉ]
         if self.end2end:
-            xt.extend(edl_preds[idx0, tokens_idx])
+            # xt.extend(edl_preds[idx0, tokens_idx])
+            raise NotImplementedError
         xt = torch.cat(xt, dim=-1)
         tree.ndata["emb"] = xt
 
         dp_12, dp_21 = self.dep_tree(tree)  # tree logits e1->e2, e2->e1
+        if len(dp_12.size()) == 1:
+            dp_12, dp_21 = dp_12.unsqueeze(0), dp_21.unsqueeze(0)
 
         # Section 3.6: Relation prediction layer
         # get hidden state for each entity's tokens
@@ -222,6 +221,11 @@ class LSTMER(nn.Module):
         dp_rel = torch.cat((dp_12_prime, dp_21_prime), dim=-1)
 
         hp_rel = self.rel_clf(dp_rel)
-        hpr_12, hpr_21 = torch.chunk(hp_rel, chunks=2, dim=-1)
+        rel_logits_12, rel_logits_21 = torch.chunk(hp_rel, chunks=2, dim=-1)
 
-        return hpr_12, hpr_21
+        if self.end2end:
+            # return rel_logits_12, rel_logits_12, ent_logits, ent_preds,
+            # ent_probs
+            raise NotImplementedError
+        else:
+            return rel_logits_12, rel_logits_21, None, None, None

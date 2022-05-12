@@ -307,6 +307,8 @@ def process_file(
         # 3. assign ents last tokens in trees
         path_g.nodes[nmap[e1_ids[-1]]].data["e1"] = torch.LongTensor([1])
         path_g.nodes[nmap[e2_ids[-1]]].data["e2"] = torch.LongTensor([1])
+        dep_g.nodes[e1_ids[-1]].data["e1"] = torch.LongTensor([1])
+        dep_g.nodes[e2_ids[-1]].data["e2"] = torch.LongTensor([1])
 
         # stack data in list
         dep_tree_lst.append(dep_g)

@@ -58,6 +58,13 @@ def parse_arguments():
                         default="",
                         help='checkpoint filename.')
 
+    parser.add_argument(
+        "--pretrained",
+        type=str,
+        default=  # noqa: E251
+        "",  # noqa: E501
+        help='pretrained model filepath.')
+
     args = parser.parse_args()
 
     return args
@@ -79,7 +86,7 @@ def get_w2v_vectors(vocab: Vocab, w2v_model_path: str):
     w2v_dim = w2v.vector_size
     w2v_vectors = torch.from_numpy(w2v.vectors)  # all word2vec vectors
     w2v_stoi = w2v.key_to_index  # w2v vocabulary: string to index mapping
-    # if our token is not found in word2vetor vocab initialize a sampled vector
+    # if our token is not found in word2vetor vocab initialize a vector
     vectors = []
     for t in tokens:
         if t == "<pad>":
@@ -101,3 +108,27 @@ def next_layer(named_layer_list):
             yield from next_layer(layer.named_children())
         else:
             yield name, layer
+
+
+def init_weights(m, load_pretrained=None, load_embd=True):
+
+    named_layers = m.named_children()
+    for name, layer in next_layer(named_layers):
+        if "Linear" in str(layer) and ("hp1" not in name or "ht1" not in name):
+            xavier_uniform_(layer.weight.data)
+            if layer.bias is not None:
+                layer.bias.data.fill_(0.)
+
+    if load_pretrained:
+        pretrained_state = torch.load(load_pretrained,
+                                      map_location=torch.device("cpu"))
+        pretrained_state = pretrained_state["model"]
+
+        state = m.state_dict()
+        for pretrained_name, pretrained_param in pretrained_state.items():
+            if pretrained_name in state:
+                if "embed" in pretrained_name and not load_embd:
+                    continue
+                else:
+                    state[pretrained_name] = pretrained_param
+        m.load_state_dict(state)

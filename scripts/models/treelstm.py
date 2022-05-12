@@ -42,9 +42,11 @@ D. Abbreviation:
     H      : LSTM's Hidden size
     E      : Embedding size, feature size
     SEQ    : Max Sequence length in the batch
-    NE-OUT : Output dimension for NER module '
-    Nt     : total number of nodes (Nt) in the batch '
+    NE-OUT : Output dimension for NER module
+    Nt     : total number of nodes (Nt) in the batch
     Nchn   : Number of children nodes in the batch
+    Nt0    : Number of children nodes of typr zero
+    Nt1    : Number of children nodes of typr one
     DEP    : Dependency embedding size
 
 E. TreeLSTMCell Impelementation:
@@ -88,15 +90,15 @@ E. TreeLSTMCell Impelementation:
                not be equal to ℓ
 
             c. The hidden state for the children nodes is denoted as htl.
-               htl = [hi] & 1 <= i <= ℓ.
+               htl = [hti] & 1 <= i <= ℓ.
                htl ∈ ℝ^(ℓ × H), hi ∈ ℝ^H
 
             d. Each child node is either of type_n0 or type_n1.
                The hidden state for typn_0 nodes is denoted as h_t0 and
                for type_n1 nodes is denoted as h_t1,
                where:
-               h_t0 = Sum( [hi | 1 <= i <= ℓ & m(i)=type_n0] )
-               h_t1 = Sum( [hi | 1 <= i <= ℓ & m(i)=type_n1] )
+               h_t0 ∈ ℝ^(H), h_t0 = Sum( [hi | 1 <= i <= ℓ & m(i)=type_n0] )
+               h_t1 ∈ ℝ^(H), h_t0 = Sum( [hi | 1 <= i <= ℓ & m(i)=type_n1] )
                m(.) is a mapping function that maps the node type
 
             e. Node-t have ℓ forget gates; a gate for each child node
@@ -107,15 +109,16 @@ E. TreeLSTMCell Impelementation:
               The forget gate (ftk, 1 <= k <= ℓ) is either a type_0 (f0) or (f1)
               type_1.
               where:
-              f0 = U00 h_t0 + U01 h_t1,  eq(a)
-              f1 = U10 h_t0 + U11 h_t1   eq(b)
+              f0 = U00 h_t0 + U01 h_t1 & f0 ∈ ℝ^(nt0 × H)  eq(a)
+              f1 = U10 h_t0 + U11 h_t1 & f1 ∈ ℝ^(nt1 × H)  eq(b)
+              see section E2
 
     E2. i,o,u eqn:
     --------------
         For node_t:
-        i_t = U_i0 . h_t0 + U_i1 . h_t1   eq(c)
-        o_t = U_o0 . h_t0 + U_o1 . h_t1   eq(d)
-        u_t = U_u0 . h_t0 + U_u1 . h_t1   eq(e)
+        i_t = U0⁽ⁱ⁾ . h_t0 + U1⁽ⁱ⁾ . h_t1   eq(c)
+        o_t = U0⁽ᵒ⁾ . h_t0 + U1⁽ᵒ⁾ . h_t1   eq(d)
+        u_t = U0⁽ᵘ⁾ . h_t0 + U1⁽ᵘ⁾ . h_t1   eq(e)
 
     E3. Proof of eq(a, b):
     ----------------------
@@ -128,12 +131,15 @@ E. TreeLSTMCell Impelementation:
               f1k = Sum(U_m(k)m(1l) * h1l) &
               1 <= l < 4 & m(1l) & m(k) is either 0 or 1
 
-                        node-t
-                      /  |  \  \
-                    ht1 ht2 ht3 ht4
-                    /    |    \  \
-              k=   1     2     3  4
-           m(k)=   0     1     1  0
+                                   ┌───┐
+                       ┌──h11──┬───┤ 1 ├───┬──h14──┐
+                       │      h12  └───┘  h13      │
+                       │       │           │       │
+                     ┌─┴──┐  ┌─┴──┐      ┌─┴──┐  ┌─┴──┐
+                     │ 11 │  │ 12 │      │ 13 │  │ 13 │
+                     └────┘  └────┘      └────┘  └────┘
+            k           1       2          3       4
+            m(k)        0       1           1       0
 
         - For each child node, the equations are:
             child-node-1: f11 = U00 h11 + U01 h12 + U01 h13 + U00 h14
@@ -151,11 +157,11 @@ E. TreeLSTMCell Impelementation:
                 f1 = U10 (h11 + h14) + U11 (h12 + h13)
             h_t0 = (h11 + h14)
             h_t1 = (h12 + h13),
-            see section E1 above.
 
             Thus:
-            f0 = U00 h_t0 + U01 h_t1
-            f1 = U10 h_t0 + U11 h_t1
+            f0 = U00 h_t0 + U01 h_t1 & f0 ∈ ℝ^(nt0 × H)
+            f1 = U10 h_t0 + U11 h_t1 & f1 ∈ ℝ^(nt1 × H)
+            note that f0 = f11 = f14 & f1 = f12 = f13
             where ht_0 is hidden states for type_n0 child nodes and ht_1 is
             hidden states for type_n1 child nodes.
 
@@ -172,29 +178,43 @@ E. TreeLSTMCell Impelementation:
 
         Step:2 i,o,t gates: based on eqs(c,d,e) Under section E2:
         *********************************************************
-            a. [ht_0, ht_1] [   Uiot   ] = [i, o, t]
-                (Nt , 2H)    (2H , 3H)   = (Nt , 3H)
+            a. [  ht_0  ] [   Uioto   ] = [i, o, t]0
+                (Nt , H)     (H , 3H)   = (Nt , 3H)
+
+               [  ht_1  ] [   Uiot1   ] = [i, o, t]1
+                (Nt , H)     (H , 3H)   = (Nt , 3H)
 
             b. `reduce_func` return [i, o, t]
 
         Step:3 Forget gate: based on eqs(a,b) Under section E1:
         *****************************************************************
-            a. [ht_0, ht_1] [    Uf    ] =  [f0, f1]    from eqs(a,b)
-                (Nt , 2H)     (2H , 2H)  =  (Nt , 2H)
+            a. [ ht_0 ]     [    Umk0    ]  =  [  f00, f10  ]
+               (Nt , H)        (H , 2H)     =     (Nt , 2H)
+
+               [ ht_1 ]     [    Umk1    ]  =  [  f01, f11  ]
+               (Nt , H)        (H , 2H)     =     (Nt , 2H)
+
+               f0 = f00 + f01  (Nt, H)
+               f1 = f10 + f11  (Nt, H)
+
+
+               [ht_0, ht_1] [     Uf     ]  =  [   f0, f1   ]
+                (Nt , 2H)     (2H , 2H)     =     (Nt , 2H)
 
             b. calculate ftk, here it denoted by Ftm(k), i.e. Ft0, Ft1. A forget
             gate per node type. Note that F10=f11=f14 & F11=f12=f13
+            Ft0 = σ(W Xt + f0 + b) ∈ ℝ^(Nt0 × H)
+            Ft1 = σ(W Xt + f1 + b) ∈ ℝ^(Nt1 × H)
 
             c. update cell status = ∑ ftl * ctl
-               ∑ ftl * ctl = f11*c11 + f12*c12 + f13*c13 + f14*c14 + f15*c15
-                           = F10*c11  + F11*c12  + F11*c13  + F10*c14
-                           = F10(c11 + c14) + F11(c12 + c13)
+               ∑ ftl * ctl = f11*c11 + f12*c12 + f13*c13 + f14*c14
+                           = Ft0*c11  + Ft1*c12  + Ft1*c13  + Ft0*c14
+                           = Ft0(c11 + c14) + Ft1(c12 + c13)
 """
 
 # pytorch
 import torch
 import torch.nn as nn
-from torch.nn.init import xavier_uniform_
 
 # DGL
 import dgl
@@ -203,19 +223,24 @@ from dgl import DGLGraph
 
 class TreeLSTMCell(nn.Module):
 
-    def __init__(self, input_size, h_size):
+    def __init__(self,
+                 input_size,
+                 h_size,
+                 normalize: bool = True):
         super(TreeLSTMCell, self).__init__()
-        self.W_iou = nn.Linear(input_size, 3 * h_size, bias=False)
+
+        self.normalize = normalize
+        self.h_size = h_size
+
+        self.W_iou = nn.Linear(input_size, 3 * h_size, bias=True)
+        self.W_f = nn.Linear(input_size, h_size, bias=True)
+
         self.U_iou = nn.Linear(2 * h_size, 3 * h_size, bias=False)
-        self.b_iou = nn.Parameter(torch.zeros(1, 3 * h_size))
-
-        self.W_f = nn.Linear(input_size, h_size, bias=False)
         self.U_f = nn.Linear(2 * h_size, 2 * h_size, bias=False)
-        self.b_f = nn.Parameter(torch.zeros(1, h_size))
 
-        self.norm = nn.ModuleList([nn.LayerNorm(h_size) for _ in range(3)])
-        self.norm_f = nn.LayerNorm(h_size)
-        self.norm_c = nn.LayerNorm(h_size)
+        # self.norm = nn.ModuleList([nn.LayerNorm(h_size) for _ in range(3)])
+        # self.norm_f = nn.LayerNorm(h_size)
+        # self.norm_c = nn.LayerNorm(h_size)
 
     def message_func(self, edges):
         return {
@@ -228,10 +253,13 @@ class TreeLSTMCell(nn.Module):
 
         c_child = nodes.mailbox["c"]  # (Nt, Nchn, H)
         h_child = nodes.mailbox["h"]  # (Nt, Nchn, H)
-        hidden_size = c_child.size(2)
 
-        # Step 1
-        type_n = nodes.mailbox["n_type"]  # (Nt)
+        X = self.W_f(nodes.data["emb"])  # (Nt, H)
+
+        type_n = nodes.mailbox["n_type"]  # (Nt, Nchn)
+        t00, t01 = torch.nonzero(type_n == 0, as_tuple=True)
+        t10, t11 = torch.nonzero(type_n == 1, as_tuple=True)
+
         type_n0_id = type_n == 0
         type_n1_id = type_n == 1
 
@@ -251,18 +279,15 @@ class TreeLSTMCell(nn.Module):
         ht_1 = torch.sum(ht_1, dim=1)  # sum over child nodes => (Nt, H)
         ct_1 = torch.sum(ct_1, dim=1)  # (Nt, H)
 
-        # # Step 2
         h_iou = torch.cat((ht_0, ht_1), dim=1)  # (Nt, 2H)
-
-        # Step 3.a
-        # (Nt, 2H) => (Nt, 2, H)
-        f = self.U_f(torch.cat((ht_0, ht_1), dim=1)).view(-1, 2, hidden_size)
-
-        # Steps 3.b.c
-        X = self.W_f(nodes.data["emb"])  # (Nt, H)
-        F_tmk = X[:, None, :] + f + self.b_f  # (Nt, 2, H)
-        F_tmk = torch.sigmoid(self.norm_f(F_tmk))
         c_tmk = torch.stack([ct_0, ct_1], dim=1)  # (Nt, 2, H)
+
+        f = self.U_f(h_iou).view(-1, 2, self.h_size)
+        F_tmk = X[:, None, :] + f  # (Nt, 2, H)
+        # if self.normalize:
+        #     F_tmk = self.norm_f(F_tmk)
+        F_tmk = torch.sigmoid(F_tmk)
+
         c_cell = torch.sum(F_tmk * c_tmk, dim=1)  # (Nt, H)
 
         return {"h": h_iou, "c": c_cell}
@@ -274,19 +299,20 @@ class TreeLSTMCell(nn.Module):
 
         # Initialization for leaf nodes
         # The leaf nodes have no child the h_child is initialized.
-        if nodes._graph.srcnodes().nelement() == 0:  # leaf nodes
+        if nodes._graph.srcnodes().nelement() == 0:
             # initialize h states, for node type-0 and node type-1
             # NOTE: initialization for node type-0 == node type-1
             h_cell = torch.cat((h_cell, h_cell), dim=1)  # (Nt, Nchn*H)
 
         # (Nt x 3*H)
-        iou = self.W_iou(nodes.data["emb"]) + self.U_iou(h_cell) + self.b_iou
-        iou = torch.chunk(iou, chunks=3, dim=1)  # (Nt x H) for each of i,o,u
-        i, o, u  = [self.norm[i](iou[i]) for i in range(3)]
+        iou = self.W_iou(nodes.data["emb"]) + self.U_iou(h_cell)
+        i, o, u = torch.chunk(iou, chunks=3, dim=1)  # 3 x (Nt x H)
+        # i, o, u = [self.norm[i](iou[i]) for i in range(3)]
         i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
 
         c = i * u + c_cell
-        h = o * torch.tanh(self.norm_c(c))
+        # h = o * torch.tanh(self.norm_c(c))
+        h = o * torch.tanh(c)
 
         return {"h": h, "c": c}
 
@@ -306,17 +332,6 @@ class TreeLSTM(nn.Module):
         self.h_size = h_size
         self.TeeLSTM_cell = TreeLSTMCell(input_size, h_size)
 
-        # learnable initial states
-        self.init_states()
-
-    def init_states(self):
-        h0 = torch.zeros(1, self.h_size)
-        c0 = torch.zeros(1, self.h_size)
-        xavier_uniform_(h0, gain=nn.init.calculate_gain("sigmoid"))
-        xavier_uniform_(c0, gain=nn.init.calculate_gain("sigmoid"))
-        self.h0 = nn.Parameter(h0, requires_grad=True)
-        self.c0 = nn.Parameter(c0, requires_grad=True)
-
     def forward(self, g: DGLGraph):
         """A modified N-ary tree-lstm (LSTM-ER) network
         ----------
@@ -327,10 +342,9 @@ class TreeLSTM(nn.Module):
         logits: Tensor
         """
         # initialize hiddedn and cell state
-        h0 = self.h0.repeat(g.num_nodes(), 1)
-        c0 = self.c0.repeat(g.num_nodes(), 1)
-        g.ndata["h"] = h0
-        g.ndata["c"] = c0
+        device = g.device
+        g.ndata["h"] = torch.zeros(g.num_nodes(), self.h_size, device=device)
+        g.ndata["c"] = torch.zeros(g.num_nodes(), self.h_size, device=device)
 
         # copy graph
         if self.bidirectional:

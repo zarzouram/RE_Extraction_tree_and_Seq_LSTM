@@ -35,7 +35,7 @@
         "dep_tree": {
             "htree_size": 100,
             "bidir_tree": true,
-            "tree_type": "shortest_path"
+            "tree_type": "full_tree"
         },
         "rel_extract": {
             "hp_size": 100
@@ -55,19 +55,17 @@
         }
     },
     "dataloader_parms": {
-        "batch_size": 63,
+        "batch_size": 32,
         "shuffle": true,
         "num_workers": 4
     },
     "train_parms": {
         "epochs": 100,
-        "early_stop": 10,
         "lr_patience": 5,
         "grad_clip": 5.0
     },
     "optim_params": {
-        "lr": 2e-3,
-        "l2reg": 1e-6,
-        "gamma": 0.9
+        "lr": 0.002,
+        "l2reg": 1e-6
     }
 }

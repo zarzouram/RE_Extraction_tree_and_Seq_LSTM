@@ -1,6 +1,4 @@
-import torch
 import torch.nn as nn
-from torch.nn.init import xavier_uniform_, calculate_gain
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn.utils.rnn import pad_packed_sequence
 from torch import Tensor
@@ -29,27 +27,14 @@ class SeqEncoder(nn.Module):
                             dropout=lstm_dropout if num_layers > 1 else 0)
 
         self.dropout = nn.Dropout(output_dropout)
-        # learnable initial states
-        self.init_states()
-
-    def init_states(self):
-        state_size = self.num_layers * self.num_dir
-        h0 = torch.zeros(state_size, 1, self.h_size)
-        c0 = torch.zeros(state_size, 1, self.h_size)
-        xavier_uniform_(h0, gain=calculate_gain("sigmoid"))
-        xavier_uniform_(c0, gain=calculate_gain("sigmoid"))
-        self.h0 = nn.Parameter(h0, requires_grad=True)
-        self.c0 = nn.Parameter(c0, requires_grad=True)
 
     def forward(self, seq: Tensor, lengths: Tensor, padding_value: float):
 
-        b_sz = seq.size(0)
         lengths = lengths.cpu()
 
         x_packed = pack_padded_sequence(seq, lengths=lengths, batch_first=True)
 
-        init_states = (self.h0.repeat(1, b_sz, 1), self.c0.repeat(1, b_sz, 1))
-        output_packed, _ = self.lstm(x_packed, init_states)
+        output_packed, _ = self.lstm(x_packed)
 
         output, _ = pad_packed_sequence(output_packed,
                                         batch_first=True,
