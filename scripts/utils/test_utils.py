@@ -112,4 +112,4 @@ def calculate_scores(scorrer_path: str, results_path: str,
         lp, lr, lf = [float(score) for score in prf]
         ls[label.strip()] = [lp, lr, lf]
 
-    return p, r, f1, acc, ls
+    return p, r, f1, acc, ls, result

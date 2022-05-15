@@ -128,8 +128,12 @@ Figure 1 shows the model architecture.
 src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/model.png"
 width="100%" padding="100px 100px 100px 100px">
 
-Figure 1: Model Architecture. Green parts are not impelemented. Edited from
+Figure 1: Model Architecture. Parts highlighted in green are not impelemented. Edited from
 [(Miwa & Bansal, ACL 2016)](#1).
+
+## Testing
+
+
 
 ## References
 
