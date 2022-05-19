@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import random
 import os
@@ -15,6 +15,7 @@ from matplotlib.legend import Legend
 from matplotlib.transforms import Bbox
 
 import numpy as np
+from numpy.typing import NDArray
 import torch
 import dgl
 
@@ -141,14 +142,17 @@ def plot_bar(rel: List[List[str]], dir: List[List[str]]) -> None:
         leg.set_bbox_to_anchor((x0, 1))
 
 
-def plot_hist(data: List[List[float]],
+def plot_hist(data: List[NDArray],
               fig_data: dict,
               bins: Optional[Union[List[List[float]], List[int]]] = None,
               norm_pdf: bool = False,
-              count: bool = False) -> None:
+              count: bool = False) -> Tuple[plt.Figure, plt.Axes]:
 
     # print histograms with normal distribution if required
-    wf, hf = (1.2, 1.3)
+    if "figsize_factor" in fig_data:
+        wf, hf = fig_data["figsize_factor"]
+    else:
+        wf, hf = (1.2, 1.3)
 
     fig_w, fig_h = plt.rcParamsDefault["figure.figsize"]
     figsize = (fig_w * wf * len(data), fig_h * hf)
