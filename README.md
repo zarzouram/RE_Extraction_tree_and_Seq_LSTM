@@ -159,8 +159,7 @@ LSTM can selectively demolish or include the states of each child node. When
 operating on the dependency tree, the child-sum LSTM can attend to certain
 dependency relations more than others.
 
-However, the goal of the neural network operating on the dependency graph for
-the relation extraction is to attend to all nodes that belong to the shortest
+However, the goal is to attend to all nodes that belong to the shortest
 path. This goal is achieved by sharing weights for the nodes that belong to the
 shortest path and assigning different weights for all other nodes.
 
