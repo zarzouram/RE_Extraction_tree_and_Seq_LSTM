@@ -218,8 +218,8 @@ the model architecture.
 src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/model.png"
 width="100%" padding="100px 100px 100px 100px">
 
-Figure 1: Model Architecture. Parts highlighted in green are not impelemented. Edited from
-[(Miwa & Bansal, ACL 2016)](#1).
+Figure 1: Model Architecture. Parts highlighted in green are not impelemented.
+Edited from [(Miwa & Bansal, ACL 2016)](#1).
 
 One of the pitfalls of using a "non-end-to-end" pipeline is that the
 model designed by the authors depends on pre-training of the entity
@@ -275,13 +275,11 @@ its official scorer which produced the following:
 
 - F1-score (Macro-F1) on the nine relation types.
 
-## Training
-
-Text
-
 ## Testing
 
-text
+The implemented model achieved a Macro-F1 score of 0.763 comparing to 0.844.
+The difference in perfromance chould be due to the differences in
+implementation as disscussed above.
 
 ## References
 
@@ -310,7 +308,7 @@ Ng, “Semantic compositionality through recursive matrix-vector spaces,” in
 language processing and computational natural language learning*, 2012, pp.
 1201–1211.
 
-<a id="6">(Tai et al., 2015)</a> K. S. Tai, R. Socher, and C. D. Manning, “Improved Semantic
-Representations From Tree-Structured Long Short-Term Memory Networks,”
-*arXiv:1503.00075 \[cs\]*, May 2015, Accessed: May 25, 2022. \[Online\].
-Available: <http://arxiv.org/abs/1503.00075>.
+<a id="6">(Tai et al., 2015)</a> K. S. Tai, R. Socher, and C. D. Manning,
+“Improved Semantic Representations From Tree-Structured Long Short-Term Memory
+Networks,” *arXiv:1503.00075 \[cs\]*, May 2015, Accessed: May 25, 2022.
+\[Online\].  Available: <http://arxiv.org/abs/1503.00075>.

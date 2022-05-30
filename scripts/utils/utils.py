@@ -49,7 +49,7 @@ def plot_bar(rel: List[List[str]], dir: List[List[str]]) -> None:
     wf, hf = (1.2, 1.3)
     fig_w, fig_h = plt.rcParamsDefault["figure.figsize"]
     figsize = (fig_w * wf * 2, fig_h * hf * 2)
-    fig, ax = plt.subplots(figsize=figsize)
+    fig, ax = plt.subplots(figsize=figsize, facecolor="w")
     fig.suptitle("Relation Labels Distribution per split", fontsize=18)
 
     # get color cycles
@@ -159,7 +159,8 @@ def plot_hist(data: List[NDArray],
     figs, axes = plt.subplots(nrows=1,
                               ncols=len(data),
                               figsize=figsize,
-                              squeeze=False)
+                              squeeze=False,
+                              facecolor="w")
     axes_ = np.array(axes).reshape(-1)
 
     # get color cycles
