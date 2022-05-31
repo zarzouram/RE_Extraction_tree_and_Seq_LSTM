@@ -322,7 +322,7 @@ confusing issue.
 src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/cm.png"
 width="100%" padding="100px 100px 100px 100px">
 
-<a id="F3">Figure 3</a>: Confusion Matrix - Shortest Path Mode(#F3).
+<a id="F3">Figure 3</a>: Confusion Matrix - Shortest Path Mode.
 
 ## 9. References
 
