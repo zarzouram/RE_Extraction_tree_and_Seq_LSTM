@@ -1,6 +1,25 @@
 # Relation Extraction using LSTMs on Sequences and Tree Structures
 
-## Introduction
+- [1. Introduction](#1-introduction)
+- [2. Project Description](#2-project-description)
+- [3. Run](#3-run)
+  - [3.1. Requirements](#31-requirements)
+  - [3.2. Prepare dataset](#32-prepare-dataset)
+  - [3.3. Train the model](#33-train-the-model)
+  - [3.4. Model testing](#34-model-testing)
+- [4. Background](#4-background)
+  - [4.1. The shortest path hypothesis](#41-the-shortest-path-hypothesis)
+- [5. Model](#5-model)
+  - [5.1. The authors' motivation](#51-the-authors-motivation)
+    - [5.1.1. Neural Network Structure](#511-neural-network-structure)
+    - [5.1.2. Tree structure](#512-tree-structure)
+  - [5.2. The Original Model](#52-the-original-model)
+- [6. Changes and pitfalls](#6-changes-and-pitfalls)
+- [7. Datasets](#7-datasets)
+- [8. Testing](#8-testing)
+- [9. References](#9-references)
+
+## 1. Introduction
 
 This repository hosts the course project for the "LT2311 H20 Språkteknologisk"
 Course. The main goal of this project is to implement End-to-End Relation
@@ -12,7 +31,7 @@ code. The report will then discuss the model, its hyperparameters, loss, and
 performance metrics. In the end, I will compare the model's performance
 documented in the paper with my implemented model's performance.
 
-## Project Description
+## 2. Project Description
 
 [(Miwa & Bansal, ACL 2016)](#1) proposed an end-to-end model that extracts
 entities and relations between them. The model is tested using two proprietary
@@ -25,14 +44,14 @@ indices for the entities to classify the relation between them.
 The project considers the evaluation against SemEval-2010 Task 8 only. Thus the
 current implementation does not support the end-to-end relation extraction.
 
-## Run
+## 3. Run
 
-### Requirements
+### 3.1. Requirements
 
 The code was tested using python 3.8.12. Use `pip install -r requirements.txt`
 to install the required libraries.
 
-### Prepare dataset
+### 3.2. Prepare dataset
 
 To process SemEval-2010 Task 8 dataset run the folowing:
 
@@ -61,7 +80,7 @@ The code will save under the `save_dir` the following files:
   4. `vocab.pth` that contains the vocabulary dictionaries (string to indices
      and indices to string mapping).
 
-### Train the model
+### 3.3. Train the model
 
 To train the model run the following
 
@@ -84,11 +103,11 @@ The following arguments are expected:
 
 You can run the code using the default values of the arguments above.
 
-### Model testing
+### 3.4. Model testing
 
 Model testing and evaluation is done in `run_test.ipynb` notebook.
 
-## Background
+## 4. Background
 
 Relation extraction (RE) is a subtask of information extraction (IE) that aims
 at detecting and classifying semantic relationships present in texts between
@@ -96,7 +115,7 @@ two or more entities. In the end-to-end extraction type, the task usually
 consists of entity detection and classification and relation detection and
 classification for the detected entities.
 
-### The shortest path hypothesis
+### 4.1. The shortest path hypothesis
 
 In 2005 Mooney and Bunescu introduced a hypothesis related to determining a
 relationship between two mentioned entities located in the same sentence. The
@@ -111,28 +130,28 @@ information needed to extract the relationship is independent of the text
 preceding or following the sentence. Finally, nodes represent the words in the
 undirected dependency graph while the edges represent the dependency.
 
-## Model
+## 5. Model
 
-### The authors' motivation
+### 5.1. The authors' motivation
 
-#### Neural Network Structure
+#### 5.1.1. Neural Network Structure
 
-The authors utilize the shortest path hypothesis discussed in Section 3.2.
-Originally the hypothesis was introduced and tested using a kernel-based model
-[(Bunescu & Mooney, 2005)](#2). Other studies successfully use the shortest
-path hypothesis using neural-based models [(Miwa & Bansal, ACL 2016)](#1). In
-that sense, the proposed model utilizes the dependency graph. However, the
-authors argued that only relying on dependency information is not enough. As
-proof of concept and to make the analysis more manageable, I checked the
-dependency relations between entities where the shortest path is only two nodes
-(accounts for nearly 30% of the SemEval-2010 Task 8 dataset).  Figure 1 shows
-that the nominal modifiers `nmod` is dominant across all relations, making it
-more challenging to establish a relation between entities using only the
-dependency information.
+The authors utilize the shortest path hypothesis discussed in [Section
+4.1](#41-the-shortest-path-hypothesis).  Originally the hypothesis was
+introduced and tested using a kernel-based model [(Bunescu & Mooney,
+2005)](#2). Other studies successfully use the shortest path hypothesis using
+neural-based models [(Miwa & Bansal, ACL 2016)](#1). In that sense, the
+proposed model utilizes the dependency graph. However, the authors argued that
+only relying on dependency information is not enough. As proof of concept and
+to make the analysis more manageable, I checked the dependency relations
+between entities where the shortest path is only two nodes (accounts for nearly
+30% of the SemEval-2010 Task 8 dataset).  Figure 1 shows that the nominal
+modifiers `nmod` is dominant across all relations, making it more challenging
+to establish a relation between entities using only the dependency information.
 
 <img
 src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/depanalysis.png"
-width="60%" padding="100px 100px 100px 100px">
+width="80%" padding="100px 100px 100px 100px">
 
 Figure 1
 
@@ -145,7 +164,7 @@ in this case) to extract the relation. The authors were able to push this low
 performance to exceed state-of-the-art (when publishing their study) by jointly
 modeling both entities and relations utilizing both sequence and tree LSTM.
 
-#### Tree structure
+#### 5.1.2. Tree structure
 
 Unlike sequential LSTMs, the tree-LSTMs do not process the words in sequential
 order. Instead, they process them according to their location in the tree data
@@ -163,7 +182,7 @@ However, the goal is to attend to all nodes that belong to the shortest
 path. This goal is achieved by sharing weights for the nodes that belong to the
 shortest path and assigning different weights for all other nodes.
 
-### The Original Model
+### 5.2. The Original Model
 
 The model consists of the following modules:
 
@@ -200,26 +219,26 @@ When the model detects the relation label in an end-to-end fashion, the
 dependency layer processes the tree structures for each possible
 combination of the last words of the detected entities.
 
-## Changes and pitfalls
+## 6. Changes and pitfalls
 
-As discussed abovel, I built a pipeline to test my model implementation —mainly
-reimplementing Miwa’s and Bansal’s work [(Miwa & Bansal, ACL 2016)](#1).  Three
-datasets were used: ACE 2004, ACE 2005, and SemEval-2010 Task 8.
-Unfortunately, ACE 2004 and ACE 2005 are proprietary datasets, so I used
-SemEval-2010 Task 8 only.
+As discussed in [Section 2](#2-project-description), I built a pipeline to test
+my model implementation —mainly reimplementing Miwa’s and Bansal’s work [(Miwa
+& Bansal, ACL 2016)](#1).  Three datasets were used: ACE 2004, ACE 2005, and
+SemEval-2010 Task 8.  Unfortunately, ACE 2004 and ACE 2005 are proprietary
+datasets, so I used SemEval-2010 Task 8 only.
 
 As SemEval-2010 Task 8 does not have entity labeling, the implementation
 pipeline does not support the end-to-end operation. The dependency layer
 expects to have the target word indices instead of processing the detected
-entities combinations. Also, I omit the entity detection layer.  Figure 1 shows
-the model architecture.
+entities combinations. Also, I omit the entity detection layer. [Figure 2](#F2)
+shows the model architecture.
 
 <img
 src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/model.png"
 width="100%" padding="100px 100px 100px 100px">
 
-Figure 1: Model Architecture. Parts highlighted in green are not impelemented.
-Edited from [(Miwa & Bansal, ACL 2016)](#1).
+<a id="F2">Figure 2:</a> Model Architecture. Parts highlighted in green are not impelemented.
+Edited from [(Miwa & Bansal, ACL 2016)](#2).
 
 One of the pitfalls of using a "non-end-to-end" pipeline is that the
 model designed by the authors depends on pre-training of the entity
@@ -261,13 +280,13 @@ concatenating them in one vector to send them to the relation label detection
 layer. The implementation should consider building a separate tree (shortest
 path) for each pair.
 
-## Datasets
+## 7. Datasets
 
-The dataset has nine relation labels constructed between two nominals
-plus the "Other" label for no relation. It has 8,000 training samples
-and 2,717 test samples. Eight hundred samples are randomly selected from
-the training dataset to form the development dataset. The dataset has
-its official scorer which produced the following:
+The SemEval-2010 Task 8  [(Hendrickx et al., 2019)](#7) dataset has nine
+relation labels constructed between two nominals plus the "Other" label for no
+relation. It has 8,000 training samples and 2,717 test samples. Eight hundred
+samples are randomly selected from the training dataset to form the development
+dataset. The dataset has its official scorer which produced the following:
 
 - Confusion matrix
 
@@ -275,13 +294,37 @@ its official scorer which produced the following:
 
 - F1-score (Macro-F1) on the nine relation types.
 
-## Testing
+## 8. Testing
 
-The implemented model achieved a Macro-F1 score of 0.763 comparing to 0.844.
-The difference in perfromance chould be due to the differences in
-implementation as disscussed above.
+The implemented model achieved a Macro-F1 score of 0.763 compared to 0.844
+reported in the paper. The difference in performance could be due to the
+differences in implementation discussed in [Section 6. Changes and pitfalls](#6-changes-and-pitfalls).
 
-## References
+As shown in [Figure 3](#F3), the –confusion matrix, the Instrument-Agency relation has
+the lowest true positive value (marked by green), hence the lowest accuracy.
+However, from the test notebook, we notice that the Other label has the lowest
+F1 score. By reviewing the confusion matrix, one can notice that the Other
+label has the highest confusion; see the raw and the column marked by the blow
+arrow. Also, [Figure 3](#F3) shows an easy confusion between the "Other" label and all
+other labels marked by a blue square. Moreover, it is easier to mistake the
+Entity-Destination and Content-Container labels for the Other label than the
+vice versa (marked by a yellow square).
+
+My analysis is that because the Instrument-Agency label has the lowest
+occurrence in the train data test, it has the lowest true positive value. Also,
+because we add a lot of negative samples "the Other label", the model hardly
+can differentiate between the Other label and all other labels. Also, using one
+tree graph per pair (right-to-left and left-to-right) as discussed in [Section
+6. Changes and pitfalls](#6-changes-and-pitfalls), may contribute to this
+confusing issue.
+
+<img
+src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/cm.png"
+width="100%" padding="100px 100px 100px 100px">
+
+<a id="F3">Figure 3</a>: Confusion Matrix - Shortest Path Mode(#F3).
+
+## 9. References
 
 <a id="1">(Miwa & Bansal, ACL 2016)</a> Miwa, M., & Bansal, M. (2016).
 End-to-end relation extraction using lstms on sequences and tree structures.
@@ -312,3 +355,7 @@ language processing and computational natural language learning*, 2012, pp.
 “Improved Semantic Representations From Tree-Structured Long Short-Term Memory
 Networks,” *arXiv:1503.00075 \[cs\]*, May 2015, Accessed: May 25, 2022.
 \[Online\].  Available: <http://arxiv.org/abs/1503.00075>.
+
+<a id="7">(Hendrickx et al., 2019)</a>I. Hendrickx et al., “Semeval-2010 task 8:
+Multi-way classification of semantic relations between pairs of nominals,”
+arXiv preprint arXiv:1911.10422, 2019
