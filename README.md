@@ -319,7 +319,7 @@ tree graph per pair (right-to-left and left-to-right) as discussed in [Section
 confusing issue.
 
 <img
-src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/cm.png"
+src="https://github.com/zarzouram/RE_Extraction_tree_and_Seq_LSTM/blob/main/imgs/cm_.png"
 width="100%" padding="100px 100px 100px 100px">
 
 <a id="F3">Figure 3</a>: Confusion Matrix - Shortest Path Mode.
