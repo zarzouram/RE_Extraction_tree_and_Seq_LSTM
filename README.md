@@ -172,11 +172,11 @@ structure representing the complex linguistic unit, like the dependency tree in
 our example. Tai et al. introduce two types of tree-LSTMs: the child-sum and
 N-ary LSTMs [(Tai et al., 2015)](#6). N-ary tree-LSTM needs a fixed number of
 children for each node; thus, it is ideal for processing binarized constituency
-trees. The child-sum can deal with different numbers of children, where the
-state for each child has its weight in the forget gate. Thus, the child-sum
-LSTM can selectively demolish or include the states of each child node. When
-operating on the dependency tree, the child-sum LSTM can attend to certain
-dependency relations more than others.
+trees. The child-sum can deal with different numbers of children. In addition
+each child node has its forget gate. Thus, the child-sum LSTM can selectively
+demolish or include the states of each child node. When operating on the
+dependency tree, the child-sum LSTM can attend to certain dependency relations
+more than others.
 
 However, the goal is to attend to all nodes that belong to the shortest
 path. This goal is achieved by sharing weights for the nodes that belong to the
